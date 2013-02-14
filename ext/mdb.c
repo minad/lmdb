@@ -260,6 +260,18 @@ VALUE transaction_commit(VALUE self) {
         return Qnil;
 }
 
+VALUE transaction_renew(VALUE self) {
+        TRANSACTION(self, transaction, environment);
+        mdb_txn_renew(transaction->txn);
+        return Qnil;
+}
+
+VALUE transaction_reset(VALUE self) {
+        TRANSACTION(self, transaction, environment);
+        mdb_txn_reset(transaction->txn);
+        return Qnil;
+}
+
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
 
@@ -594,6 +606,8 @@ void Init_mdb() {
         cTransaction = rb_define_class_under(mMDB, "Transaction", rb_cObject);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
+        rb_define_method(cTransaction, "reset", transaction_reset, 0);
+        rb_define_method(cTransaction, "renew", transaction_renew, 0);
         rb_define_method(cTransaction, "transaction", transaction_transaction, 0);
         rb_define_method(cTransaction, "environment", transaction_environment, 0);
         rb_define_method(cTransaction, "parent", transaction_parent, 0);
