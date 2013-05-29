@@ -254,6 +254,13 @@ describe MDB do
         db.get(txn, 'key').must_equal 'value'
       end
     end
+
+    it 'returns cursor' do
+      db = subject
+      cursor = db.cursor
+      cursor.must_be_instance_of MDB::Cursor
+    end
+
   end
 
   describe MDB::Cursor do
