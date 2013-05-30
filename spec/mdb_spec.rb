@@ -257,8 +257,20 @@ describe MDB do
 
     it 'returns cursor' do
       db = subject
-      cursor = db.cursor
+      cursor = nil
+      @env.transaction do |txn|
+        cursor = db.cursor(txn)
+      end
       cursor.must_be_instance_of MDB::Cursor
+    end
+
+    it 'returns stat' do
+      db = subject
+      stat = nil
+      @env.transaction do |txn|
+        stat = db.stat(txn)
+      end
+      stat.must_be_instance_of MDB::Stat
     end
 
   end

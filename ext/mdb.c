@@ -594,13 +594,13 @@ void Init_mdb() {
 
         cDatabase = rb_define_class_under(mMDB, "Database", rb_cObject);
         rb_define_method(cDatabase, "close", database_close, 0);
-        rb_define_method(cDatabase, "stat", database_stat, 0);
+        rb_define_method(cDatabase, "stat", database_stat, 1);
         rb_define_method(cDatabase, "drop", database_drop, 1);
         rb_define_method(cDatabase, "clear", database_clear, 1);
         rb_define_method(cDatabase, "get", database_get, 2);
         rb_define_method(cDatabase, "put", database_put, -1);
         rb_define_method(cDatabase, "delete", database_delete, -1);
-        rb_define_method(cDatabase, "cursor", database_cursor, 0);
+        rb_define_method(cDatabase, "cursor", database_cursor, 1);
         rb_define_method(cDatabase, "environment", database_environment, 0);
 
         cTransaction = rb_define_class_under(mMDB, "Transaction", rb_cObject);
