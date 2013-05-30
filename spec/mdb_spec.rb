@@ -328,5 +328,11 @@ describe MDB do
       end
     end
 
+    it 'should seek to key with nuls' do
+      with_cursor do |cursor|
+        cursor.set_range("\x00").must_equal ['key1', 'value1']
+      end
+    end
+
   end
 end

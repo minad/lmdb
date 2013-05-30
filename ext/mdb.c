@@ -514,7 +514,7 @@ static VALUE cursor_set(VALUE self, VALUE inkey) {
   MDB_val key, value;
 
   key.mv_size = RSTRING_LEN(inkey);
-  key.mv_data = StringValueCStr(inkey);
+  key.mv_data = StringValuePtr(inkey);
 
   check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET));
   return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
@@ -525,7 +525,7 @@ static VALUE cursor_set_range(VALUE self, VALUE inkey) {
   MDB_val key, value;
 
   key.mv_size = RSTRING_LEN(inkey);
-  key.mv_data = StringValueCStr(inkey);
+  key.mv_data = StringValuePtr(inkey);
 
   check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET_RANGE));
   return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
