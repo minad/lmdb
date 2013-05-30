@@ -493,6 +493,44 @@ static VALUE cursor_close(VALUE self) {
         return Qnil;
 }
 
+static VALUE cursor_first(VALUE self) {
+  CURSOR(self, cursor, database, transaction, environment);
+  MDB_val key, value;
+
+  check(mdb_cursor_get(cursor->cur, &key, &value, MDB_FIRST));
+  return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+}
+
+static VALUE cursor_next(VALUE self) {
+  CURSOR(self, cursor, database, transaction, environment);
+  MDB_val key, value;
+
+  check(mdb_cursor_get(cursor->cur, &key, &value, MDB_NEXT));
+  return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+}
+
+static VALUE cursor_set(VALUE self, VALUE inkey) {
+  CURSOR(self, cursor, database, transaction, environment);
+  MDB_val key, value;
+
+  key.mv_size = RSTRING_LEN(inkey);
+  key.mv_data = StringValueCStr(inkey);
+
+  check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET));
+  return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+}
+
+static VALUE cursor_set_range(VALUE self, VALUE inkey) {
+  CURSOR(self, cursor, database, transaction, environment);
+  MDB_val key, value;
+
+  key.mv_size = RSTRING_LEN(inkey);
+  key.mv_data = StringValueCStr(inkey);
+
+  check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET_RANGE));
+  return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+}
+
 static VALUE cursor_get(VALUE self) {
         CURSOR(self, cursor, database, transaction, environment);
         // TODO
@@ -615,6 +653,10 @@ void Init_mdb() {
         cCursor = rb_define_class_under(mMDB, "Cursor", rb_cObject);
         rb_define_method(cCursor, "close", cursor_close, 0);
         rb_define_method(cCursor, "get", cursor_get, 0);
+        rb_define_method(cCursor, "first", cursor_first, 0);
+        rb_define_method(cCursor, "next", cursor_next, 0);
+        rb_define_method(cCursor, "set", cursor_set, 1);
+        rb_define_method(cCursor, "set_range", cursor_set_range, 1);
         rb_define_method(cCursor, "put", cursor_put, 0);
         rb_define_method(cCursor, "delete", cursor_delete, 0);
         rb_define_method(cCursor, "database", cursor_database, 0);

@@ -260,6 +260,7 @@ describe MDB do
       cursor = nil
       @env.transaction do |txn|
         cursor = db.cursor(txn)
+        cursor.close
       end
       cursor.must_be_instance_of MDB::Cursor
     end
@@ -276,5 +277,56 @@ describe MDB do
   end
 
   describe MDB::Cursor do
+    before do
+      @db = @env.transaction do |txn|
+        @env.open(txn, 'db', MDB::CREATE)
+      end
+
+      @env.transaction do |txn|
+        @db.put(txn, 'key1', 'value1')
+        @db.put(txn, 'key2', 'value2')
+      end
+    end
+
+    after do
+      @db.close
+    end
+
+    def with_cursor
+      @env.transaction do |txn|
+        cursor = @db.cursor(txn)
+        begin
+          yield cursor
+        ensure
+          cursor.close
+        end
+      end
+    end
+
+    it 'should get first key/value' do
+      with_cursor do |cursor|
+        cursor.first.must_equal ['key1', 'value1']
+      end
+    end
+
+    it 'should get next key/value' do
+      with_cursor do |cursor|
+        cursor.first
+        cursor.next.must_equal ['key2', 'value2']
+      end
+    end
+
+    it 'should seek to key' do
+      with_cursor do |cursor|
+        cursor.set('key1').must_equal ['key1', 'value1']
+      end
+    end
+
+    it 'should seek to closest key' do
+      with_cursor do |cursor|
+        cursor.set_range('key0').must_equal ['key1', 'value1']
+      end
+    end
+
   end
 end
