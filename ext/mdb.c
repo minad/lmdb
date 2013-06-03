@@ -162,7 +162,8 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
         VALUE path, options;
         int n = rb_scan_args(argc, argv, "11", &path, &options);
 
-        int flags = 0, maxreaders = -1, mapsize = -1, maxdbs = 10;
+        int flags = 0, maxreaders = -1, maxdbs = 10;
+        size_t mapsize = -1;
         mode_t mode = 0755;
         if (n == 2) {
                 VALUE value = rb_hash_aref(options, ID2SYM(rb_intern("flags")));
@@ -179,7 +180,7 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
                         maxdbs = NUM2INT(value);
                 value = rb_hash_aref(options, ID2SYM(rb_intern("mapsize")));
                 if (!NIL_P(value))
-                        mapsize = NUM2INT(value);
+                        mapsize = NUM2LON(value);
         }
 
         MDB_env* env;
