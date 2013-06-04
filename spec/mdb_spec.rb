@@ -1,4 +1,6 @@
-require './ext/mdb'
+$LOAD_PATH.push File.expand_path("../../ext", __FILE__)
+
+require 'mdb'
 require 'fileutils'
 require 'minitest/spec'
 require 'minitest/autorun'

@@ -1,0 +1,16 @@
+PATH
+  remote: .
+  specs:
+    mdb-ruby (0.0.1)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (10.0.4)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  mdb-ruby!
+  rake
