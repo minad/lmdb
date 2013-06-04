@@ -8,7 +8,7 @@ http://symas.com/mdb/
 Install via rubygems:
 
 ```ruby
-gem install mdb
+gem install mdb-rb
 ```
 
 ### Licence (MIT)
