@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    mdb-ruby (0.0.1)
+    mdb-rb (0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -12,5 +12,5 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  mdb-ruby!
+  mdb-rb!
   rake
