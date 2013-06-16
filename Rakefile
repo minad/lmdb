@@ -4,7 +4,7 @@ require 'bundler/setup'
 require 'rspec/core/rake_task'
 require "rake/extensiontask"
 
-gemspec = Bundler.load_gemspec(File.expand_path("../mdb-rb.gemspec", __FILE__))
+gemspec = Bundler.load_gemspec(File.expand_path("../mdb.gemspec", __FILE__))
 
 RSpec::Core::RakeTask.new :spec
 
