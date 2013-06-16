@@ -1,26 +1,17 @@
 #!/usr/bin/env rake
 
-require 'rake/testtask'
+require 'bundler/setup'
+require 'rspec/core/rake_task'
+require "rake/extensiontask"
 
-desc "Build the extension"
-task :build do
-  ext = File.expand_path("../ext", __FILE__)
-  sh "cd #{ext} && ruby extconf.rb && make"
+gemspec = Bundler.load_gemspec(File.expand_path("../mdb-rb.gemspec", __FILE__))
+
+RSpec::Core::RakeTask.new :spec
+
+Rake::ExtensionTask.new :mdb_ext, gemspec do |ext|
+  ext.ext_dir = 'ext/mdb'
+  ext.lib_dir = 'lib/mdb'
 end
 
-desc "Delete the build"
-task :clean do
-  ext = File.expand_path("../ext", __FILE__)
-  sh "cd #{ext} && ruby extconf.rb && make clean"
-end
-
-Rake::TestTask.new :test do |t|
-  t.libs.push "ext"
-  t.test_files = FileList['spec/*_spec.rb']
-  t.verbose = true
-end
-
-task :test => :build
-
-desc 'Default: run test.'
-task :default => :test
+desc 'Default: run specs.'
+task :default => :spec
