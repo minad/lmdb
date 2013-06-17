@@ -3,7 +3,7 @@ require 'spec_helper'
 describe MDB::Database do
 
   subject    { env.db(:pets) }
-  # after      { subject.close }
+  after      { subject.close }
 
   its(:name) { should == "pets" }
   its(:env)  { should == env }
