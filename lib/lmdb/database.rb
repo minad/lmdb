@@ -1,4 +1,4 @@
-class MDB::Database
+class LMDB::Database
 
   class << self
     private :new
@@ -7,10 +7,10 @@ class MDB::Database
   # @attr_reader [String] name
   attr_reader :name
 
-  # @attr_reader [MDB::Environment] env
+  # @attr_reader [LMDB::Environment] env
   attr_reader :env
 
-  # @param [MDB::Environment] env
+  # @param [LMDB::Environment] env
   # @param [String] name the DB name
   def initialize(env, name)
     @env  = env
@@ -27,7 +27,7 @@ class MDB::Database
   def get(key)
     ensure_db!
     rtxn {|txn| raw.get(txn, key) }
-  rescue MDB::Ext::Error::NOTFOUND
+  rescue LMDB::Ext::Error::NOTFOUND
   end
   alias_method :[], :get
 
@@ -44,7 +44,7 @@ class MDB::Database
   private
 
     def raw
-      @raw ||= rtxn {|txn| renv.open(txn, name, MDB::CREATE) }
+      @raw ||= rtxn {|txn| renv.open(txn, name, LMDB::CREATE) }
     end
 
     def renv

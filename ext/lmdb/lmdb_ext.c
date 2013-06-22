@@ -616,16 +616,16 @@ static VALUE cursor_count(VALUE self) {
 }
 
 
-void Init_mdb_ext() {
-    VALUE mMDB, mExt;
+void Init_lmdb_ext() {
+    VALUE mLMDB, mExt;
 
-    mMDB = rb_define_module("MDB");
-    rb_define_const(mMDB, "VERSION", rb_str_new2(MDB_VERSION_STRING));
+    mLMDB = rb_define_module("LMDB");
+    rb_define_const(mLMDB, "VERSION", rb_str_new2(MDB_VERSION_STRING));
 
-    mExt = rb_define_module_under(mMDB, "Ext");
+    mExt = rb_define_module_under(mLMDB, "Ext");
     rb_define_singleton_method(mExt, "open", environment_open, -1);
 
-    #define NUM_CONST(name) rb_define_const(mMDB, #name, INT2NUM(MDB_##name))
+    #define NUM_CONST(name) rb_define_const(mLMDB, #name, INT2NUM(MDB_##name))
 
     // Versions
     NUM_CONST(VERSION_MAJOR);

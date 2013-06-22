@@ -1,13 +1,13 @@
 PATH
   remote: .
   specs:
-    mdb-rb (0.1.0)
+    lmdb (0.1.0)
 
 GEM
   remote: https://rubygems.org/
   specs:
     diff-lcs (1.2.4)
-    rake (10.0.4)
+    rake (10.1.0)
     rake-compiler (0.8.3)
       rake
     rspec (2.13.0)
@@ -23,7 +23,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  mdb-rb!
+  lmdb!
   rake
   rake-compiler
   rspec

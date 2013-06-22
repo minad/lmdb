@@ -21,5 +21,5 @@ if enable_config("bundled-lmdb", false) || !have_lmbd
   find_header 'lmdb.h'
 end
 
-create_makefile('mdb_ext')
+create_makefile('lmdb_ext')
 

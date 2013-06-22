@@ -5,10 +5,10 @@ Gem::Specification.new do |s|
   s.version     = "0.1.0"
   s.platform    = Gem::Platform::RUBY
   s.licenses    = ["MIT"]
-  s.summary     = "Ruby bindings to LMDB"
+  s.summary     = "Ruby bindings to Lightning MDB"
   s.email       = "mail@daniel-mendler.de"
   s.homepage    = "https://github.com/minad/mdb"
-  s.description = "mdb is a Ruby binding to LMDB."
+  s.description = "imdb is a Ruby binding to OpenLDAP Lightning MDB."
   s.authors     = ["Daniel Mendler", "Black Square Media"]
   s.extensions  = Dir["ext/**/extconf.rb"]
 

@@ -1,4 +1,4 @@
-class MDB::Environment
+class LMDB::Environment
 
   DEFAULT_OPTS = {
     path: ".",
@@ -57,11 +57,11 @@ class MDB::Environment
   #   flushes system buffers at the end of a transaction; slower, but more durable, defaults to true
   # @option opts [Boolean] :meta_sync
   #   flush system buffers on every write and not only at the end of a transaction; slower, but more durable, defaults to false
-  # @raises [MDB::Error] on errors
+  # @raises [LMDB::Error] on errors
   def initialize(opts = {})
     opts  = DEFAULT_OPTS.merge(opts)
     @path = opts[:path].to_s
-    @raw  = MDB::Ext::Environment.open path, parse(opts)
+    @raw  = LMDB::Ext::Environment.open path, parse(opts)
   end
 
   # Manually sync the environment
@@ -69,7 +69,7 @@ class MDB::Environment
   # @param [Hash] opts options
   # @option opts [Boolean] :force force sync, default false
   # @return [Boolean] true if successful
-  # @raises [MDB::Error] on errors
+  # @raises [LMDB::Error] on errors
   def sync(opts = {})
     @raw.sync !!opts[:force]
     true
@@ -88,16 +88,16 @@ class MDB::Environment
   #
   # Executes a transaction
   # @yield a transaction
-  # @yieldparam [MDB::Transaction] txn the transaction instance
+  # @yieldparam [LMDB::Transaction] txn the transaction instance
   # def transaction(&block)
-  #   MDB::Transaction.send(:new, self, &block)
+  #   LMDB::Transaction.send(:new, self, &block)
   # end
 
   # Opens a database
   # @param [String] name
-  # @return [MDB::Database] the database
+  # @return [LMDB::Database] the database
   def database(name)
-    MDB::Database.send(:new, self, name)
+    LMDB::Database.send(:new, self, name)
   end
   alias_method :db, :database
 
@@ -118,11 +118,11 @@ class MDB::Environment
 
     def parse(opts)
       flags = 0
-      flags |= MDB::NOSUBDIR   unless opts[:sub_dirs]
-      flags |= MDB::RDONLY     if opts[:read_only]
-      flags |= MDB::WRITEMAP   if opts[:mmap]
-      flags |= MDB::NOSYNC     unless opts[:sync]
-      flags |= MDB::NOMETASYNC unless opts[:meta_sync]
+      flags |= LMDB::NOSUBDIR   unless opts[:sub_dirs]
+      flags |= LMDB::RDONLY     if opts[:read_only]
+      flags |= LMDB::WRITEMAP   if opts[:mmap]
+      flags |= LMDB::NOSYNC     unless opts[:sync]
+      flags |= LMDB::NOMETASYNC unless opts[:meta_sync]
 
       { flags: flags,
         mode: opts[:mode],

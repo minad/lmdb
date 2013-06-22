@@ -1,6 +1,6 @@
-# MDB
+# LMDB
 
-Ruby bindings for the amazing OpenLDAP's Lightning Memory-Mapped Database (LMDB)
+Ruby bindings for the amazing OpenLDAP's Lightning Memory-Mapped Database (LLMDB)
 http://symas.com/mdb/
 
 ### Installation
@@ -8,7 +8,7 @@ http://symas.com/mdb/
 Install via rubygems:
 
 ```ruby
-gem install mdb
+gem install lmdb
 ```
 
 ### Licence (MIT)

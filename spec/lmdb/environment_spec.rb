@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe MDB::Environment do
+describe LMDB::Environment do
 
   subject    { env }
 
@@ -15,8 +15,8 @@ describe MDB::Environment do
   end
 
   it 'should open databases' do
-    subject.database(:pets).should be_instance_of(MDB::Database)
-    subject.db(:pets).should be_instance_of(MDB::Database)
+    subject.database(:pets).should be_instance_of(LMDB::Database)
+    subject.db(:pets).should be_instance_of(LMDB::Database)
   end
 
 end

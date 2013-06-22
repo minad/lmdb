@@ -16,7 +16,7 @@ shared_examples "an environment" do
     end
 
     it 'accepts options' do
-      env = subject.open(path, :flags => MDB::NOSYNC, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
+      env = subject.open(path, :flags => LMDB::NOSYNC, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
       env.should be_instance_of(described_class::Environment)
       env.info.maxreaders.should == 777
       env.info.mapsize.should == 111111
@@ -25,13 +25,13 @@ shared_examples "an environment" do
   end
 end
 
-describe MDB::Ext do
+describe LMDB::Ext do
 
-  let(:env)  { MDB::Ext.open(path) }
+  let(:env)  { LMDB::Ext.open(path) }
   after      { env.close }
 
   it_behaves_like "an environment" do
-    subject { MDB::Ext }
+    subject { LMDB::Ext }
   end
 
   describe "Stat" do
@@ -82,8 +82,8 @@ describe MDB::Ext do
     end
 
     it 'should accept custom flags' do
-      (subject.flags = MDB::NOSYNC).should == MDB::NOSYNC
-      subject.flags.should == MDB::NOSYNC
+      (subject.flags = LMDB::NOSYNC).should == LMDB::NOSYNC
+      subject.flags.should == LMDB::NOSYNC
 
       (subject.flags = 0).should == 0
       subject.flags.should == 0
@@ -139,7 +139,7 @@ describe MDB::Ext do
 
     subject do
       env.transaction do |txn|
-        env.open(txn, 'db', MDB::CREATE)
+        env.open(txn, 'db', LMDB::CREATE)
       end
     end
     let!(:db) { subject }
@@ -178,14 +178,14 @@ describe MDB::Ext do
 
     it 'should close' do
       db.close.should be_nil
-      -> { db.close }.should raise_error(MDB::Ext::Error, /closed/)
+      -> { db.close }.should raise_error(LMDB::Ext::Error, /closed/)
     end
 
     it "should be correctly GC'd", segfault: true do
-      db = env.transaction {|t| env.open(t, 'db', MDB::CREATE) }
+      db = env.transaction {|t| env.open(t, 'db', LMDB::CREATE) }
       db = nil
       GC.start
-      db = env.transaction {|t| env.open(t, 'db', MDB::CREATE) }
+      db = env.transaction {|t| env.open(t, 'db', LMDB::CREATE) }
     end
 
   end
@@ -193,7 +193,7 @@ describe MDB::Ext do
   describe "Cursor" do
 
     let! :db do
-      env.transaction {|txn| env.open(txn, 'db', MDB::CREATE) }
+      env.transaction {|txn| env.open(txn, 'db', LMDB::CREATE) }
     end
 
     before do

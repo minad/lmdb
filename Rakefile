@@ -8,9 +8,9 @@ require "rake/extensiontask"
 RSpec::Core::RakeTask.new :spec
 
 # Install compile task
-Rake::ExtensionTask.new :mdb_ext do |ext|
-  ext.ext_dir = 'ext/mdb'
-  ext.lib_dir = 'lib/mdb'
+Rake::ExtensionTask.new :lmdb_ext do |ext|
+  ext.ext_dir = 'ext/lmdb'
+  ext.lib_dir = 'lib/lmdb'
 end
 
 desc 'Default: compile & run specs.'

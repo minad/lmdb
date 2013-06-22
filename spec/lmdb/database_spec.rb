@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe MDB::Database do
+describe LMDB::Database do
 
   subject    { env.db(:pets) }
   after      { subject.close }
