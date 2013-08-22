@@ -1,4 +1,4 @@
-require 'lmdb/lmdb_ext'
+require 'lmdb_ext'
 
 module LMDB
 
