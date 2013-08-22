@@ -3,7 +3,8 @@ class LMDB::Environment
   DEFAULT_OPTS = {
     path: ".",
     mode: 0755,
-    max_size: (2**32-1), # 4G
+    max_size: (2**28-1), # 4G
+    # max_size: 1_000_000,
     max_dbs: 16,
     max_readers: 126,
     sub_dirs: true,
