@@ -34,6 +34,31 @@
     Data_Get_Struct(var, Cursor, var_cur);                  \
     cursor_check(var_cur)
 
+#define WITH_TRANSACTION(name, required, optional)                      \
+    static VALUE name##_with_transaction(WithTransactionArgs*);         \
+    static VALUE name(int argc, VALUE *argv, VALUE self) {              \
+        DATABASE(self, database);                                       \
+        if (argc < required || argc > required + optional + 1)          \
+            rb_raise(rb_eRuntimeError, "Wrong number of arguments");    \
+        if (argc < 1 || TYPE(argv[0]) != T_DATA) {                      \
+            MDB_txn* txn;                                               \
+            check(mdb_txn_begin(database->transaction->environment->env, database->transaction->txn, 0, &txn)); \
+            WithTransactionArgs args = { database, txn, argc, argv  };  \
+            int exception;                                              \
+            VALUE result = rb_protect(RUBY_METHOD_FUNC(name##_with_transaction), (VALUE)&args, &exception); \
+            if (exception) {                                            \
+                mdb_txn_abort(txn);                                     \
+                rb_jump_tag(exception);                                 \
+            }                                                           \
+            mdb_txn_commit(txn);                                        \
+            return result;                                              \
+        }                                                               \
+        TRANSACTION(argv[0], transaction);                              \
+        WithTransactionArgs args = { database, transaction->txn, argc - 1, argv + 1 }; \
+        return name##_with_transaction(&args);                           \
+    }                                                                   \
+    static VALUE name##_with_transaction(WithTransactionArgs* a)
+
 /*-----------------------------------------------------------------------------
  * Static
  *----------------------------------------------------------------------------*/
@@ -78,6 +103,13 @@ typedef struct {
     Transaction* transaction;
     MDB_cursor*  cur;
 } Cursor;
+
+typedef struct {
+    Database* database;
+    MDB_txn*  txn;
+    int       argc;
+    VALUE*    argv;
+} WithTransactionArgs;
 
 /*-----------------------------------------------------------------------------
  * Prototypes
@@ -187,26 +219,23 @@ static VALUE environment_copy(VALUE self, VALUE path) {
 }
 
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self) {
-    VALUE force;
-    int n;
-
     ENVIRONMENT(self, environment);
-    n = rb_scan_args(argc, argv, "01", &force);
-    check(mdb_env_sync(environment->env, n == 1 && RTEST(force) ? 0 : 1));
+
+    VALUE force;
+    rb_scan_args(argc, argv, "01", &force);
+
+    check(mdb_env_sync(environment->env, RTEST(force)));
     return Qnil;
 }
 
 static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
-    VALUE path, options, venv;
-    MDB_env* env;
-    Environment* environment;
-
-    int n = rb_scan_args(argc, argv, "11", &path, &options);
+    VALUE path, options;
+    rb_scan_args(argc, argv, "11", &path, &options);
 
     int flags = 0, maxreaders = -1, maxdbs = 10;
     size_t mapsize = 0;
     mode_t mode = 0755;
-    if (n == 2) {
+    if (!NIL_P(options)) {
         VALUE value = rb_hash_aref(options, ID2SYM(rb_intern("flags")));
         if (!NIL_P(value))
             flags = NUM2INT(value);
@@ -228,9 +257,11 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
             mapsize = NUM2SIZET(value);
     }
 
+    MDB_env* env;
     check(mdb_env_create(&env));
 
-    venv = Data_Make_Struct(cEnvironment, Environment, 0, environment_deref, environment);
+    Environment* environment;
+    VALUE venv = Data_Make_Struct(cEnvironment, Environment, 0, environment_deref, environment);
     environment->env = env;
     environment->refcount = 1;
 
@@ -274,7 +305,9 @@ static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
     ENVIRONMENT(self, environment);
 
     VALUE readonly;
-    unsigned int flags = (rb_scan_args(argc, argv, "01", &readonly) == 1 && !NIL_P(readonly)) ? MDB_RDONLY : 0;
+    rb_scan_args(argc, argv, "01", &readonly);
+
+    unsigned int flags = RTEST(readonly) ? MDB_RDONLY : 0;
 
     MDB_txn* txn;
     check(mdb_txn_begin(environment->env, 0, flags, &txn));
@@ -375,11 +408,16 @@ static VALUE transaction_reset(VALUE self) {
     return Qnil;
 }
 
-static VALUE transaction_transaction(VALUE self) {
+static VALUE transaction_transaction(int argc, VALUE* argv, VALUE self) {
     TRANSACTION(self, transaction);
 
+    VALUE readonly;
+    rb_scan_args(argc, argv, "01", &readonly);
+
+    unsigned int flags = RTEST(readonly) ? MDB_RDONLY : 0;
+
     MDB_txn* txn;
-    check(mdb_txn_begin(mdb_txn_env(transaction->txn), transaction->txn, 0, &txn));
+    check(mdb_txn_begin(mdb_txn_env(transaction->txn), transaction->txn, flags, &txn));
 
     Transaction* child;
     VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_deref, child);
@@ -436,10 +474,10 @@ static VALUE database_open(int argc, VALUE *argv, VALUE self) {
     TRANSACTION(self, transaction);
 
     VALUE vname, vflags;
-    int n = rb_scan_args(argc, argv, "11", &vname, &vflags);
+    rb_scan_args(argc, argv, "11", &vname, &vflags);
 
     MDB_dbi dbi;
-    check(mdb_dbi_open(transaction->txn, StringValueCStr(vname), n == 3 ? NUM2INT(vflags) : 0, &dbi));
+    check(mdb_dbi_open(transaction->txn, NIL_P(vname) ? 0 : StringValueCStr(vname), NIL_P(vflags) ? 0 : NUM2INT(vflags), &dbi));
 
     Database* database;
     VALUE vdb = Data_Make_Struct(cDatabase, Database, database_mark, database_free, database);
@@ -459,55 +497,40 @@ static VALUE database_close(VALUE self) {
     return Qnil;
 }
 
-static VALUE database_stat(VALUE self, VALUE vtxn) {
-    // TODO First transaction argument vtxn should be optional
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
+WITH_TRANSACTION(database_stat, 0, 0) {
     MDB_stat* stat;
     VALUE vstat = Data_Make_Struct(cStat, MDB_stat, 0, -1, stat);
-    check(mdb_stat(transaction->txn, database->dbi, stat));
+    check(mdb_stat(a->txn, a->database->dbi, stat));
     return vstat;
 }
 
-static VALUE database_drop(VALUE self, VALUE vtxn) {
-    // TODO First transaction argument vtxn should be optional
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
-    check(mdb_drop(transaction->txn, database->dbi, 1));
-    database->open = 0;
+WITH_TRANSACTION(database_drop, 0, 0) {
+    check(mdb_drop(a->txn, a->database->dbi, 1));
+    a->database->open = 0;
     return Qnil;
 }
 
-static VALUE database_clear(VALUE self, VALUE vtxn) {
-    // TODO First transaction argument vtxn should be optional
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
-    check(mdb_drop(transaction->txn, database->dbi, 0));
+WITH_TRANSACTION(database_clear, 0, 0) {
+    check(mdb_drop(a->txn, a->database->dbi, 0));
     return Qnil;
 }
 
-static VALUE database_get(VALUE self, VALUE vtxn, VALUE vkey) {
-    // TODO First transaction argument vtxn should be optional
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
-    vkey = StringValue(vkey);
+WITH_TRANSACTION(database_get, 1, 0) {
+    VALUE vkey = StringValue(a->argv[0]);
     MDB_val key, value;
     key.mv_size = RSTRING_LEN(vkey);
     key.mv_data = RSTRING_PTR(vkey);
-    check(mdb_get(transaction->txn, database->dbi, &key, &value));
+
+    int ret = mdb_get(a->txn, a->database->dbi, &key, &value);
+    if (ret == MDB_NOTFOUND)
+        return Qnil;
+    check(ret);
     return rb_str_new(value.mv_data, value.mv_size);
 }
 
-static VALUE database_put(int argc, VALUE *argv, VALUE self) {
-    // TODO First transaction argument vtxn should be optional
-    VALUE vtxn, vkey, vval, vflags;
-    int n = rb_scan_args(argc, argv, "31", &vtxn, &vkey, &vval, &vflags);
-
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
-
-    vkey = StringValue(vkey);
-    vval = StringValue(vval);
+WITH_TRANSACTION(database_put, 2, 1) {
+    VALUE vkey = StringValue(a->argv[0]);
+    VALUE vval = StringValue(a->argv[1]);
 
     MDB_val key, value;
     key.mv_size = RSTRING_LEN(vkey);
@@ -515,32 +538,25 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
     value.mv_size = RSTRING_LEN(vval);
     value.mv_data = RSTRING_PTR(vval);
 
-    check(mdb_put(transaction->txn, database->dbi, &key, &value, n == 4 ? NUM2INT(vflags) : 0));
+    check(mdb_put(a->txn, a->database->dbi, &key, &value, a->argc == 3 ? NUM2INT(a->argv[2]) : 0));
     return Qnil;
 }
 
-static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
-    // TODO First transaction argument vtxn should be optional
-    VALUE vtxn, vkey, vval;
-    int n = rb_scan_args(argc, argv, "21", &vtxn, &vkey, &vval);
-
-    DATABASE(self, database);
-    TRANSACTION(vtxn, transaction);
-
-    vkey = StringValue(vkey);
+WITH_TRANSACTION(database_delete, 1, 1) {
+    VALUE vkey = StringValue(vkey);
 
     MDB_val key;
     key.mv_size = RSTRING_LEN(vkey);
     key.mv_data = RSTRING_PTR(vkey);
 
-    if (n == 3) {
-        vval = StringValue(vval);
+    if (a->argc == 1) {
+        check(mdb_del(a->txn, a->database->dbi, &key, 0));
+    } else {
+        VALUE vval = StringValue(a->argv[1]);
         MDB_val value;
         value.mv_size = RSTRING_LEN(vval);
         value.mv_data = RSTRING_PTR(vval);
-        check(mdb_del(transaction->txn, database->dbi, &key, &value));
-    } else {
-        check(mdb_del(transaction->txn, database->dbi, &key, 0));
+        check(mdb_del(a->txn, a->database->dbi, &key, &value));
     }
 
     return Qnil;
@@ -574,10 +590,18 @@ static VALUE cursor_close(VALUE self) {
     return Qnil;
 }
 
-static VALUE database_cursor(VALUE self, VALUE vtxn) {
-    // TODO First transaction argument vtxn should be optional
-
+static VALUE database_cursor(int argc, VALUE* argv, VALUE self) {
     DATABASE(self, database);
+
+    VALUE vtxn;
+    rb_scan_args(argc, argv, "01", &vtxn);
+
+    if (NIL_P(vtxn)) {
+        if (!rb_block_given_p())
+            rb_raise(rb_eRuntimeError, "You must either specify a transaction or give a block");
+        vtxn = transaction_transaction(database->vtxn, 0, 0);
+    }
+
     TRANSACTION(vtxn, transaction);
 
     MDB_cursor* cur;
@@ -590,8 +614,20 @@ static VALUE database_cursor(VALUE self, VALUE vtxn) {
     cursor->transaction = transaction;
     ++transaction->refcount;
 
-    if (rb_block_given_p())
-        return rb_ensure(rb_yield, vcur, cursor_close, vcur);
+    if (rb_block_given_p()) {
+        int exception;
+        VALUE result = rb_protect(rb_yield, vcur, &exception);
+        if (exception) {
+            cursor_close(vcur);
+            mdb_txn_abort(transaction->txn);
+            transaction->txn = 0;
+            rb_jump_tag(exception);
+        }
+        cursor_close(vcur);
+        mdb_txn_commit(transaction->txn);
+        transaction->txn = 0;
+        return result;
+    }
 
     return vcur;
 }
@@ -653,9 +689,9 @@ static VALUE cursor_put(VALUE self) {
 
 static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
     CURSOR(self, cursor);
-    VALUE flags;
-    int n = rb_scan_args(argc, argv, "01", &flags);
-    check(mdb_cursor_del(cursor->cur, n == 1 ? NUM2INT(flags) : 0));
+    VALUE vflags;
+    rb_scan_args(argc, argv, "01", &vflags);
+    check(mdb_cursor_del(cursor->cur, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
     return Qnil;
 }
 
@@ -740,13 +776,13 @@ void Init_lmdb_ext() {
 
     cDatabase = rb_define_class_under(mLMDB, "Database", rb_cObject);
     rb_define_method(cDatabase, "close", database_close, 0);
-    rb_define_method(cDatabase, "stat", database_stat, 1);
-    rb_define_method(cDatabase, "drop", database_drop, 1);
-    rb_define_method(cDatabase, "clear", database_clear, 1);
-    rb_define_method(cDatabase, "get", database_get, 2);
+    rb_define_method(cDatabase, "stat", database_stat, -1);
+    rb_define_method(cDatabase, "drop", database_drop, -1);
+    rb_define_method(cDatabase, "clear", database_clear, -1);
+    rb_define_method(cDatabase, "get", database_get, -1);
     rb_define_method(cDatabase, "put", database_put, -1);
     rb_define_method(cDatabase, "delete", database_delete, -1);
-    rb_define_method(cDatabase, "cursor", database_cursor, 1);
+    rb_define_method(cDatabase, "cursor", database_cursor, -1);
     rb_define_method(cDatabase, "transaction", database_transaction, 0);
 
     cTransaction = rb_define_class_under(mLMDB, "Transaction", rb_cObject);
@@ -755,7 +791,7 @@ void Init_lmdb_ext() {
     rb_define_method(cTransaction, "commit", transaction_commit, 0);
     rb_define_method(cTransaction, "reset", transaction_reset, 0);
     rb_define_method(cTransaction, "renew", transaction_renew, 0);
-    rb_define_method(cTransaction, "transaction", transaction_transaction, 0);
+    rb_define_method(cTransaction, "transaction", transaction_transaction, -1);
     rb_define_method(cTransaction, "environment", transaction_environment, 0);
     rb_define_method(cTransaction, "parent", transaction_parent, 0);
 

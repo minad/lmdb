@@ -166,15 +166,15 @@ describe LMDB do
   describe LMDB::Database do
     subject { db }
 
-    it 'should get/set data' do
+    it 'should get/put data' do
       subject.get('cat').should be_nil
-      subject.set('cat', 'garfield').should be_nil
+      subject.put('cat', 'garfield').should be_nil
       subject.get('cat').should == 'garfield'
     end
 
-    it 'should get/set data' do
+    it 'should get/put data' do
       subject.get('cat').should be_nil
-      subject.set('cat', 'garfield').should be_nil
+      subject.put('cat', 'garfield').should be_nil
       subject.get('cat').should == 'garfield'
     end
 
@@ -185,16 +185,16 @@ describe LMDB do
 
     it 'stores key/values in different transactions' do
       txn.transaction do |ctxn|
-        db.put('key', 'value').should be_nil
+        db.put(ctxn, 'key', 'value').should be_nil
       end
 
       txn.transaction do |ctxn|
-        db.get('key').should == 'value'
+        db.get(ctxn, 'key').should == 'value'
       end
     end
 
     it 'should return stat' do
-      db.stat.should be_instance_of(described_class::Stat)
+      db.stat.should be_instance_of(LMDB::Stat)
     end
 
     it 'should close' do
