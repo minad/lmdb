@@ -116,47 +116,71 @@ describe LMDB do
       subject { env}
 
       it 'should create transactions' do
+        subject.active_txn.should == nil
         subject.transaction do |txn|
+          subject.active_txn.should == txn
           txn.should be_instance_of(described_class::Transaction)
           txn.abort
+          subject.active_txn.should == nil
         end
+        subject.active_txn.should == nil
       end
 
       it 'should create read-only transactions' do
+        subject.active_txn.should == nil
         subject.transaction(true) do |txn|
+          subject.active_txn.should == txn
           txn.should be_instance_of(described_class::Transaction)
           txn.abort
+          subject.active_txn.should == nil
         end
+        subject.active_txn.should == nil
       end
 
       it 'can create child transactions' do
+        subject.active_txn.should == nil
         env.transaction do |txn|
-          txn.should be_instance_of(described_class::Transaction)
+          subject.active_txn.should == txn
           env.transaction do |ctxn|
-            ctxn.should be_instance_of(described_class::Transaction)
+            subject.active_txn.should == ctxn
             ctxn.abort
+            subject.active_txn.should == txn
           end
+          subject.active_txn.should == txn
         end
+        subject.active_txn.should == nil
       end
 
       it 'should support aborting parent transaction' do
+        subject.active_txn.should == nil
         env.transaction do |txn|
+          subject.active_txn.should == txn
           env.transaction do |ctxn|
+            subject.active_txn.should == ctxn
             db['key'] = 'value'
             txn.abort
+            subject.active_txn.should == nil
           end
+          subject.active_txn.should == nil
         end
         db['key'].should be(nil)
+        subject.active_txn.should == nil
       end
 
       it 'should support comitting parent transaction' do
+        subject.active_txn.should == nil
         env.transaction do |txn|
+          subject.active_txn.should == txn
           env.transaction do |ctxn|
+            subject.active_txn.should == ctxn
             db['key'] = 'value'
             txn.commit
+            subject.active_txn.should == nil
           end
+          subject.active_txn.should == nil
         end
         db['key'].should == 'value'
+        subject.active_txn.should == nil
       end
     end
   end

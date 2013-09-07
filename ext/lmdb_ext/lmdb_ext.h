@@ -37,13 +37,14 @@ typedef struct Transaction Transaction;
 typedef struct Transaction {
         VALUE    env;
         VALUE    parent;
+        VALUE    thread;
         MDB_txn* txn;
         int      refcount;
 } Transaction;
 
 typedef struct {
         MDB_env* env;
-        VALUE    txn;
+        VALUE    __txn;
         int      refcount;
 } Environment;
 
@@ -73,6 +74,7 @@ static VALUE cEnvironment, cDatabase, cTransaction, cCursor, cError;
 
 // BEGIN PROTOTYPES
 void Init_lmdb_ext();
+static MDB_txn* active_txn(VALUE self);
 static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags);
 static VALUE call_with_transaction_helper(VALUE arg);
 static void check(int code);
@@ -98,6 +100,7 @@ static VALUE database_get(VALUE self, VALUE vkey);
 static void database_mark(Database* database);
 static VALUE database_put(int argc, VALUE *argv, VALUE self);
 static VALUE database_stat(VALUE self);
+static VALUE environment_active_txn(VALUE self);
 static void environment_check(Environment* environment);
 static VALUE environment_close(VALUE self);
 static VALUE environment_copy(VALUE self, VALUE path);
@@ -105,18 +108,20 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self);
 static void environment_deref(Environment *environment);
 static VALUE environment_flags(VALUE self);
 static VALUE environment_info(VALUE self);
-static MDB_txn* environment_need_txn(VALUE self);
+static void environment_mark(Environment* environment);
 static VALUE environment_open(int argc, VALUE *argv, VALUE klass);
 static VALUE environment_path(VALUE self);
+static void environment_set_active_txn(VALUE self, VALUE txn);
 static VALUE environment_set_flags(VALUE self, VALUE vflags);
 static VALUE environment_stat(VALUE self);
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self);
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self);
-static MDB_txn* environment_txn(VALUE self);
+static MDB_txn* need_txn(VALUE self);
 static VALUE stat2hash(const MDB_stat* stat);
 static VALUE transaction_abort(VALUE self);
 static VALUE transaction_commit(VALUE self);
 static void transaction_deref(Transaction* transaction);
+static void transaction_finish(VALUE self, int commit);
 static void transaction_mark(Transaction* transaction);
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags);
 // END PROTOTYPES
