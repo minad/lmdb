@@ -26,7 +26,7 @@ module LMDB::SpecHelper
 end
 
 RSpec.configure do |c|
-  c.filter_run_excluding segfault: true
+  #c.filter_run_excluding segfault: true
   c.include LMDB::SpecHelper
   c.after { FileUtils.rm_rf TEMP_ROOT.to_s }
 end
