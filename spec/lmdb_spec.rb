@@ -204,6 +204,12 @@ describe LMDB do
       db.size.should == 2
     end
 
+    it 'should be enumerable' do
+      db['k1'] = 'v1'
+      db['k2'] = 'v2'
+      db.to_a.should == [['k1', 'v1'], ['k2', 'v2']]
+    end
+
     it 'should have shortcuts' do
       db['key'] = 'value'
       db['key'].should == 'value'

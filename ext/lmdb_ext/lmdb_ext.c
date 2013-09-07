@@ -497,7 +497,10 @@ static VALUE cursor_prev(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
 
-        check(mdb_cursor_get(cursor->cur, &key, &value, MDB_PREV));
+        int ret = mdb_cursor_get(cursor->cur, &key, &value, MDB_PREV);
+        if (ret == MDB_NOTFOUND)
+                return Qnil;
+        check(ret);
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
@@ -505,7 +508,10 @@ static VALUE cursor_next(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
 
-        check(mdb_cursor_get(cursor->cur, &key, &value, MDB_NEXT));
+        int ret = mdb_cursor_get(cursor->cur, &key, &value, MDB_NEXT);
+        if (ret == MDB_NOTFOUND)
+                return Qnil;
+        check(ret);
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 

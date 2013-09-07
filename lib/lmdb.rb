@@ -5,7 +5,11 @@ module LMDB
     include Enumerable
 
     def each
-      cursor {|c| yield(c.next) }
+      cursor do |c|
+        while i = c.next
+          yield(i)
+        end
+      end
     end
 
     def [](key)
