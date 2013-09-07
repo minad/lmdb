@@ -351,8 +351,15 @@ static VALUE database_stat(VALUE self) {
 static VALUE database_drop(VALUE self) {
         DATABASE(self, database);
         if (!environment_get_txn(database->env))
-                return call_with_transaction(database->env, self, "stat", 0, 0, 0);
+                return call_with_transaction(database->env, self, "drop", 0, 0, 0);
+        check(mdb_drop(environment_need_txn(database->env), database->dbi, 1));
+        return Qnil;
+}
 
+static VALUE database_clear(VALUE self) {
+        DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "clear", 0, 0, 0);
         check(mdb_drop(environment_need_txn(database->env), database->dbi, 0));
         return Qnil;
 }
@@ -627,6 +634,7 @@ void Init_lmdb_ext() {
         rb_undef_method(rb_singleton_class(cDatabase), "new");
         rb_define_method(cDatabase, "stat", database_stat, 0);
         rb_define_method(cDatabase, "drop", database_drop, 0);
+        rb_define_method(cDatabase, "clear", database_clear, 0);
         rb_define_method(cDatabase, "get", database_get, 1);
         rb_define_method(cDatabase, "put", database_put, -1);
         rb_define_method(cDatabase, "delete", database_delete, -1);
