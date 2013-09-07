@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name        = File.basename(__FILE__, '.gemspec')
-  s.version     = '0.1.0'
+  s.version     = '0.2.0'
   s.platform    = Gem::Platform::RUBY
   s.licenses    = ['MIT']
   s.summary     = 'Ruby bindings to Lightning MDB'
