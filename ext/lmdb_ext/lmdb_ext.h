@@ -46,7 +46,7 @@ typedef struct Transaction {
 
 typedef struct {
         MDB_env* env;
-        VALUE    active_txn;
+        VALUE    txn;
         int      refcount;
 } Environment;
 
@@ -61,6 +61,13 @@ typedef struct {
         MDB_cursor* cur;
 } Cursor;
 
+typedef struct {
+        VALUE self;
+        const char* name;
+        int argc;
+        const VALUE* argv;
+} HelperArgs;
+
 static VALUE cEnvironment, cDatabase, cTransaction, cCursor, cError;
 
 #define ERROR(name) static VALUE cError_##name;
@@ -69,6 +76,8 @@ static VALUE cEnvironment, cDatabase, cTransaction, cCursor, cError;
 
 // BEGIN PROTOTYPES
 void Init_lmdb_ext();
+static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags);
+static VALUE call_with_transaction_helper(VALUE arg);
 static void check(int code);
 static void cursor_check(Cursor* cursor);
 static VALUE cursor_close(VALUE self);
@@ -83,7 +92,7 @@ static VALUE cursor_prev(VALUE self);
 static VALUE cursor_put(int argc, VALUE* argv, VALUE self);
 static VALUE cursor_set(VALUE self, VALUE vkey);
 static VALUE cursor_set_range(VALUE self, VALUE vkey);
-static VALUE database_cursor(int argc, VALUE* argv, VALUE self);
+static VALUE database_cursor(VALUE self);
 static VALUE database_delete(int argc, VALUE *argv, VALUE self);
 static void database_deref(Database* database);
 static VALUE database_drop(VALUE self);
@@ -91,14 +100,15 @@ static VALUE database_get(VALUE self, VALUE vkey);
 static void database_mark(Database* database);
 static VALUE database_put(int argc, VALUE *argv, VALUE self);
 static VALUE database_stat(VALUE self);
-static MDB_txn* environment_active_txn(VALUE self, int raise);
 static void environment_check(Environment* environment);
 static VALUE environment_close(VALUE self);
 static VALUE environment_copy(VALUE self, VALUE path);
 static VALUE environment_database(int argc, VALUE *argv, VALUE self);
 static void environment_deref(Environment *environment);
 static VALUE environment_flags(VALUE self);
+static MDB_txn* environment_get_txn(VALUE self);
 static VALUE environment_info(VALUE self);
+static MDB_txn* environment_need_txn(VALUE self);
 static VALUE environment_open(int argc, VALUE *argv, VALUE klass);
 static VALUE environment_path(VALUE self);
 static VALUE environment_set_flags(VALUE self, VALUE vflags);

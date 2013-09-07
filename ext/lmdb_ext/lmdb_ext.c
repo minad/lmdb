@@ -34,10 +34,10 @@ static void transaction_check(Transaction* transaction) {
         if (!transaction->txn)
                 rb_raise(cError, "Transaction is terminated");
         ENVIRONMENT(transaction->env, environment);
-        if (NIL_P(environment->active_txn))
+        if (NIL_P(environment->txn))
                 rb_raise(cError, "Transaction is not active");
-        TRANSACTION(environment->active_txn, active_txn);
-        if (active_txn != transaction)
+        TRANSACTION(environment->txn, txn);
+        if (txn != transaction)
                 rb_raise(cError, "Transaction is not active");
 }
 
@@ -53,7 +53,7 @@ static VALUE transaction_commit(VALUE self) {
                 rb_raise(cError, "Transaction is terminated");
         mdb_txn_commit(transaction->txn);
         transaction->txn = 0;
-        environment->active_txn = transaction->parent;
+        environment->txn = transaction->parent;
         return Qnil;
 }
 
@@ -64,35 +64,44 @@ static VALUE transaction_abort(VALUE self) {
                 rb_raise(cError, "Transaction is terminated");
         mdb_txn_abort(transaction->txn);
         transaction->txn = 0;
-        environment->active_txn = transaction->parent;
+        environment->txn = transaction->parent;
         return Qnil;
+}
+
+static VALUE call_with_transaction_helper(VALUE arg) {
+        HelperArgs* a = (HelperArgs*)arg;
+        return rb_funcall_passing_block(a->self, rb_intern(a->name), a->argc, a->argv);
+}
+
+static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags) {
+        HelperArgs arg = { self, name, argc, argv };
+        return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags) {
         ENVIRONMENT(venv, environment);
 
         MDB_txn* txn;
-        check(mdb_txn_begin(environment->env, environment_active_txn(venv, 0), flags, &txn));
+        check(mdb_txn_begin(environment->env, environment_get_txn(venv), flags, &txn));
 
         Transaction* transaction;
         VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_deref, transaction);
         transaction->refcount = 1;
-        transaction->parent = environment->active_txn;
+        transaction->parent = environment->txn;
         transaction->env = venv;
         transaction->txn = txn;
-        environment->active_txn = vtxn;
+        environment->txn = vtxn;
 
         int exception;
         VALUE result = rb_protect(fn, NIL_P(arg) ? vtxn : arg, &exception);
 
         if (exception) {
-                if (vtxn == environment->active_txn)
+                if (vtxn == environment->txn)
                         transaction_abort(vtxn);
                 rb_jump_tag(exception);
         }
-        if (vtxn == environment->active_txn)
+        if (vtxn == environment->txn)
                 transaction_commit(vtxn);
-        printf("%d\n", NIL_P(environment->active_txn));
         return result;
 }
 
@@ -210,7 +219,7 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
         VALUE venv = Data_Make_Struct(cEnvironment, Environment, 0, environment_deref, environment);
         environment->env = env;
         environment->refcount = 1;
-        environment->active_txn = Qnil;
+        environment->txn = Qnil;
 
         if (maxreaders > 0)
                 check(mdb_env_set_maxreaders(environment->env, maxreaders));
@@ -248,15 +257,19 @@ static VALUE environment_set_flags(VALUE self, VALUE vflags) {
         return environment_flags(self);
 }
 
-static MDB_txn* environment_active_txn(VALUE self, int raise) {
+static MDB_txn* environment_get_txn(VALUE self) {
         ENVIRONMENT(self, environment);
-        if (NIL_P(environment->active_txn)) {
-                if (raise)
-                        rb_raise(cError, "No active transaction");
+        if (NIL_P(environment->txn))
                 return 0;
-        }
-        TRANSACTION(environment->active_txn, transaction);
+        TRANSACTION(environment->txn, transaction);
         return transaction->txn;
+}
+
+static MDB_txn* environment_need_txn(VALUE self) {
+        MDB_txn* txn = environment_get_txn(self);
+        if (!txn)
+                rb_raise(cError, "No active transaction");
+        return txn;
 }
 
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
@@ -283,12 +296,14 @@ static void database_mark(Database* database) {
 
 static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
+        if (NIL_P(environment->txn))
+                return call_with_transaction(self, self, "database", argc, argv, 0);
 
         VALUE vname, vflags;
         rb_scan_args(argc, argv, "11", &vname, &vflags);
 
         MDB_dbi dbi;
-        check(mdb_dbi_open(environment_active_txn(self, 1), NIL_P(vname) ? 0 : StringValueCStr(vname), NIL_P(vflags) ? 0 : NUM2INT(vflags), &dbi));
+        check(mdb_dbi_open(environment_need_txn(self), NIL_P(vname) ? 0 : StringValueCStr(vname), NIL_P(vflags) ? 0 : NUM2INT(vflags), &dbi));
 
         Database* database;
         VALUE vdb = Data_Make_Struct(cDatabase, Database, database_mark, database_deref, database);
@@ -302,26 +317,34 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
 
 static VALUE database_stat(VALUE self) {
         DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "stat", 0, 0, MDB_RDONLY);
+
         MDB_stat stat;
-        check(mdb_stat(environment_active_txn(database->env, 1), database->dbi, &stat));
+        check(mdb_stat(environment_need_txn(database->env), database->dbi, &stat));
         return stat2hash(&stat);
 }
 
 static VALUE database_drop(VALUE self) {
         DATABASE(self, database);
-        check(mdb_drop(environment_active_txn(database->env, 1), database->dbi, 0));
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "stat", 0, 0, 0);
+
+        check(mdb_drop(environment_need_txn(database->env), database->dbi, 0));
         return Qnil;
 }
 
 static VALUE database_get(VALUE self, VALUE vkey) {
         DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "get", 1, &vkey, MDB_RDONLY);
 
         vkey = StringValue(vkey);
         MDB_val key, value;
         key.mv_size = RSTRING_LEN(vkey);
         key.mv_data = RSTRING_PTR(vkey);
 
-        int ret = mdb_get(environment_active_txn(database->env, 1), database->dbi, &key, &value);
+        int ret = mdb_get(environment_need_txn(database->env), database->dbi, &key, &value);
         if (ret == MDB_NOTFOUND)
                 return Qnil;
         check(ret);
@@ -330,6 +353,8 @@ static VALUE database_get(VALUE self, VALUE vkey) {
 
 static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "put", argc, argv, 0);
 
         VALUE vkey, vflags, vval;
         rb_scan_args(argc, argv, "21", &vkey, &vval, &vflags);
@@ -343,12 +368,14 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         value.mv_size = RSTRING_LEN(vval);
         value.mv_data = RSTRING_PTR(vval);
 
-        check(mdb_put(environment_active_txn(database->env, 1), database->dbi, &key, &value, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
+        check(mdb_put(environment_need_txn(database->env), database->dbi, &key, &value, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
         return Qnil;
 }
 
 static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "delete", argc, argv, 0);
 
         VALUE vkey, vval;
         rb_scan_args(argc, argv, "11", &vkey, &vval);
@@ -360,13 +387,13 @@ static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
         key.mv_data = RSTRING_PTR(vkey);
 
         if (NIL_P(vval)) {
-                check(mdb_del(environment_active_txn(database->env, 1), database->dbi, &key, 0));
+                check(mdb_del(environment_need_txn(database->env), database->dbi, &key, 0));
         } else {
                 VALUE vval = StringValue(vval);
                 MDB_val value;
                 value.mv_size = RSTRING_LEN(vval);
                 value.mv_data = RSTRING_PTR(vval);
-                check(mdb_del(environment_active_txn(database->env, 1), database->dbi, &key, &value));
+                check(mdb_del(environment_need_txn(database->env), database->dbi, &key, &value));
         }
 
         return Qnil;
@@ -396,11 +423,13 @@ static VALUE cursor_close(VALUE self) {
         return Qnil;
 }
 
-static VALUE database_cursor(int argc, VALUE* argv, VALUE self) {
+static VALUE database_cursor(VALUE self) {
         DATABASE(self, database);
+        if (!environment_get_txn(database->env))
+                return call_with_transaction(database->env, self, "cursor", 0, 0, 0);
 
         MDB_cursor* cur;
-        check(mdb_cursor_open(environment_active_txn(database->env, 1), database->dbi, &cur));
+        check(mdb_cursor_open(environment_need_txn(database->env), database->dbi, &cur));
 
         Cursor* cursor;
         VALUE vcur = Data_Make_Struct(cCursor, Cursor, cursor_mark, cursor_free, cursor);
@@ -578,7 +607,7 @@ void Init_lmdb_ext() {
         rb_define_method(cDatabase, "get", database_get, 1);
         rb_define_method(cDatabase, "put", database_put, -1);
         rb_define_method(cDatabase, "delete", database_delete, -1);
-        rb_define_method(cDatabase, "cursor", database_cursor, -1);
+        rb_define_method(cDatabase, "cursor", database_cursor, 0);
 
         cTransaction = rb_define_class_under(mLMDB, "Transaction", rb_cObject);
         rb_undef_method(rb_singleton_class(cCursor), "new");
