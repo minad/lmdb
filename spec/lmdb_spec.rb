@@ -172,12 +172,6 @@ describe LMDB do
       subject.get('cat').should == 'garfield'
     end
 
-    it 'should get/put data' do
-      subject.get('cat').should be_nil
-      subject.put('cat', 'garfield').should be_nil
-      subject.get('cat').should == 'garfield'
-    end
-
     it 'stores key/values in same transaction' do
       db.put('key', 'value').should be_nil
       db.get('key').should == 'value'

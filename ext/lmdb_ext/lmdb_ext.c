@@ -44,7 +44,7 @@
             MDB_txn* txn;                                               \
             Transaction *parent = database->transaction;                \
             while (parent->child)                                       \
-                parent = parent->child;                                 \
+                    parent = parent->child;                             \
             check(mdb_txn_begin(database->transaction->environment->env, parent, 0, &txn)); \
             WithTransactionArgs args = { database, txn, argc, argv  };  \
             int exception;                                              \
