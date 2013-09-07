@@ -11,7 +11,8 @@
                 MDB_RDONLY      |               \
                 MDB_NOMETASYNC  |               \
                 MDB_WRITEMAP    |               \
-                MDB_MAPASYNC)
+                MDB_MAPASYNC    |               \
+                MDB_NOTLS)
 
 #define ENVIRONMENT(var, var_env)                       \
         Environment* var_env;                           \
@@ -88,6 +89,7 @@ static VALUE cursor_prev(VALUE self);
 static VALUE cursor_put(int argc, VALUE* argv, VALUE self);
 static VALUE cursor_set(VALUE self, VALUE vkey);
 static VALUE cursor_set_range(VALUE self, VALUE vkey);
+static VALUE database_clear(VALUE self);
 static VALUE database_cursor(VALUE self);
 static VALUE database_delete(int argc, VALUE *argv, VALUE self);
 static void database_deref(Database* database);
@@ -102,7 +104,6 @@ static VALUE environment_copy(VALUE self, VALUE path);
 static VALUE environment_database(int argc, VALUE *argv, VALUE self);
 static void environment_deref(Environment *environment);
 static VALUE environment_flags(VALUE self);
-static MDB_txn* environment_get_txn(VALUE self);
 static VALUE environment_info(VALUE self);
 static MDB_txn* environment_need_txn(VALUE self);
 static VALUE environment_open(int argc, VALUE *argv, VALUE klass);
@@ -111,6 +112,7 @@ static VALUE environment_set_flags(VALUE self, VALUE vflags);
 static VALUE environment_stat(VALUE self);
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self);
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self);
+static MDB_txn* environment_txn(VALUE self);
 static VALUE stat2hash(const MDB_stat* stat);
 static VALUE transaction_abort(VALUE self);
 static VALUE transaction_commit(VALUE self);

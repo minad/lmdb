@@ -107,7 +107,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         ENVIRONMENT(venv, environment);
 
         MDB_txn* txn;
-        check(mdb_txn_begin(environment->env, environment_get_txn(venv), flags, &txn));
+        check(mdb_txn_begin(environment->env, environment_txn(venv), flags, &txn));
 
         Transaction* transaction;
         VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_deref, transaction);
@@ -282,7 +282,7 @@ static VALUE environment_set_flags(VALUE self, VALUE vflags) {
         return environment_flags(self);
 }
 
-static MDB_txn* environment_get_txn(VALUE self) {
+static MDB_txn* environment_txn(VALUE self) {
         ENVIRONMENT(self, environment);
         if (NIL_P(environment->txn))
                 return 0;
@@ -293,7 +293,7 @@ static MDB_txn* environment_get_txn(VALUE self) {
 }
 
 static MDB_txn* environment_need_txn(VALUE self) {
-        MDB_txn* txn = environment_get_txn(self);
+        MDB_txn* txn = environment_txn(self);
         if (!txn)
                 rb_raise(cError, "No active transaction");
         return txn;
@@ -344,7 +344,7 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
 
 static VALUE database_stat(VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "stat", 0, 0, MDB_RDONLY);
 
         MDB_stat stat;
@@ -354,7 +354,7 @@ static VALUE database_stat(VALUE self) {
 
 static VALUE database_drop(VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "drop", 0, 0, 0);
         check(mdb_drop(environment_need_txn(database->env), database->dbi, 1));
         return Qnil;
@@ -362,7 +362,7 @@ static VALUE database_drop(VALUE self) {
 
 static VALUE database_clear(VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "clear", 0, 0, 0);
         check(mdb_drop(environment_need_txn(database->env), database->dbi, 0));
         return Qnil;
@@ -370,7 +370,7 @@ static VALUE database_clear(VALUE self) {
 
 static VALUE database_get(VALUE self, VALUE vkey) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "get", 1, &vkey, MDB_RDONLY);
 
         vkey = StringValue(vkey);
@@ -387,7 +387,7 @@ static VALUE database_get(VALUE self, VALUE vkey) {
 
 static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "put", argc, argv, 0);
 
         VALUE vkey, vflags, vval;
@@ -408,7 +408,7 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
 
 static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "delete", argc, argv, 0);
 
         VALUE vkey, vval;
@@ -459,7 +459,7 @@ static VALUE cursor_close(VALUE self) {
 
 static VALUE database_cursor(VALUE self) {
         DATABASE(self, database);
-        if (!environment_get_txn(database->env))
+        if (!environment_txn(database->env))
                 return call_with_transaction(database->env, self, "cursor", 0, 0, 0);
 
         MDB_cursor* cur;
@@ -579,7 +579,7 @@ static VALUE cursor_count(VALUE self) {
         CURSOR(self, cursor);
         size_t count;
         check(mdb_cursor_count(cursor->cur, &count));
-        return INT2NUM(count);
+        return SIZET2NUM(count);
 }
 
 void Init_lmdb_ext() {
