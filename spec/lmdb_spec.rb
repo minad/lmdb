@@ -21,6 +21,7 @@ describe LMDB do
     LMDB::NOMETASYNC.should be_instance_of(Fixnum)
     LMDB::WRITEMAP.should be_instance_of(Fixnum)
     LMDB::MAPASYNC.should be_instance_of(Fixnum)
+    LMDB::NOTLS.should be_instance_of(Fixnum)
   end
 
   it 'has database flags' do
