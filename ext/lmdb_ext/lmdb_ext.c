@@ -594,6 +594,7 @@ void Init_lmdb_ext() {
         NUM_CONST(NOMETASYNC);
         NUM_CONST(WRITEMAP);
         NUM_CONST(MAPASYNC);
+        NUM_CONST(NOTLS);
 
         // Database flags
         NUM_CONST(REVERSEKEY);
@@ -603,6 +604,8 @@ void Init_lmdb_ext() {
         NUM_CONST(INTEGERDUP);
         NUM_CONST(REVERSEDUP);
         NUM_CONST(CREATE);
+
+        // Write flags
         NUM_CONST(NOOVERWRITE);
         NUM_CONST(NODUPDATA);
         NUM_CONST(CURRENT);
