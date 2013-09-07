@@ -1,6 +1,6 @@
 require 'mkmf'
 
-#$CFLAGS = '-std=c99 -Wall -g'
+$CFLAGS = '-std=c99 -Wall -g'
 
 # Embed lmdb if we cannot find it
 def have_lmbd
