@@ -110,27 +110,51 @@ describe LMDB do
       subject.flags.should == 0
     end
 
-    it 'should create transactions' do
-      subject.transaction do |txn|
-        txn.should be_instance_of(described_class::Transaction)
-        txn.abort
-      end
-    end
+    describe 'transaction' do
+      subject { env}
 
-    it 'should create read-only transactions' do
-      subject.transaction(true) do |txn|
-        txn.should be_instance_of(described_class::Transaction)
-        txn.abort
-      end
-    end
-
-    it 'can create child transactions' do
-      env.transaction do |txn|
-        txn.should be_instance_of(described_class::Transaction)
-        env.transaction do |ctxn|
-          ctxn.should be_instance_of(described_class::Transaction)
-          ctxn.abort
+      it 'should create transactions' do
+        subject.transaction do |txn|
+          txn.should be_instance_of(described_class::Transaction)
+          txn.abort
         end
+      end
+
+      it 'should create read-only transactions' do
+        subject.transaction(true) do |txn|
+          txn.should be_instance_of(described_class::Transaction)
+          txn.abort
+        end
+      end
+
+      it 'can create child transactions' do
+        env.transaction do |txn|
+          txn.should be_instance_of(described_class::Transaction)
+          env.transaction do |ctxn|
+            ctxn.should be_instance_of(described_class::Transaction)
+            ctxn.abort
+          end
+        end
+      end
+
+      it 'should support aborting parent transaction' do
+        env.transaction do |txn|
+          env.transaction do |ctxn|
+            db['key'] = 'value'
+            txn.abort
+          end
+        end
+        db['key'].should be(nil)
+      end
+
+      it 'should support comitting parent transaction' do
+        env.transaction do |txn|
+          env.transaction do |ctxn|
+            db['key'] = 'value'
+            txn.commit
+          end
+        end
+        db['key'].should == 'value'
       end
     end
   end

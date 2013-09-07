@@ -53,10 +53,12 @@ static VALUE transaction_commit(VALUE self) {
         mdb_txn_commit(transaction->txn);
 
         p = environment->txn;
-        do {
+        while (p != self) {
                 TRANSACTION(p, txn);
                 txn->txn = 0;
-        } while (p != self);
+                p = txn->parent;
+        }
+        transaction->txn = 0;
 
         environment->txn = transaction->parent;
         return Qnil;
@@ -80,10 +82,12 @@ static VALUE transaction_abort(VALUE self) {
         mdb_txn_abort(transaction->txn);
 
         p = environment->txn;
-        do {
+        while (p != self) {
                 TRANSACTION(p, txn);
                 txn->txn = 0;
+                p = txn->parent;
         } while (p != self);
+        transaction->txn = 0;
 
         environment->txn = transaction->parent;
         return Qnil;
