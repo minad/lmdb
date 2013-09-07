@@ -11,6 +11,10 @@ Install via rubygems:
 gem install lmdb
 ```
 
+### API
+
+For now take a look at the specs.
+
 ### Licence (MIT)
 
 ```
