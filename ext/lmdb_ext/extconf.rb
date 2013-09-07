@@ -1,5 +1,7 @@
 require 'mkmf'
 
+#$CFLAGS = '-std=c99 -Wall -g'
+
 # Embed lmdb if we cannot find it
 def have_lmbd
   find_header('lmdb.h') && have_library('lmdb', 'mdb_env_create')

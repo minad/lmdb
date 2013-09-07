@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
   s.email       = "mail@daniel-mendler.de"
   s.homepage    = "https://github.com/minad/mdb"
   s.description = "imdb is a Ruby binding to OpenLDAP Lightning MDB."
-  s.authors     = ["Daniel Mendler", "Black Square Media"]
+  s.authors     = ["Daniel Mendler"]
   s.extensions  = Dir["ext/**/extconf.rb"]
 
   s.files         = `git ls-files`.split("\n")
