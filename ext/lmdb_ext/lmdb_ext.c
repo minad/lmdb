@@ -323,7 +323,7 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
                 return call_with_transaction(self, self, "database", argc, argv, 0);
 
         VALUE vname, vflags;
-        rb_scan_args(argc, argv, "11", &vname, &vflags);
+        rb_scan_args(argc, argv, "02", &vname, &vflags);
 
         MDB_dbi dbi;
         check(mdb_dbi_open(environment_need_txn(self), NIL_P(vname) ? 0 : StringValueCStr(vname), NIL_P(vflags) ? 0 : NUM2INT(vflags), &dbi));

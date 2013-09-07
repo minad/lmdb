@@ -4,7 +4,7 @@ describe LMDB do
   let(:env) { LMDB.open(path) }
   after     { env.close rescue nil }
 
-  let(:db)  { env.database('db', LMDB::CREATE) }
+  let(:db)  { env.database }
 
   it 'has version constants' do
     LMDB::VERSION_MAJOR.should be_instance_of(Fixnum)
@@ -169,6 +169,19 @@ describe LMDB do
 
     it 'should return stat' do
       db.stat.should be_instance_of(Hash)
+    end
+
+    it 'should return size' do
+      db.size.should == 0
+      db.put('key', 'value')
+      db.size.should == 1
+      db.put('key2', 'value2')
+      db.size.should == 2
+    end
+
+    it 'should have shortcuts' do
+      db['key'] = 'value'
+      db['key'].should == 'value'
     end
   end
 
