@@ -22,4 +22,3 @@ if enable_config("bundled-lmdb", false) || !have_lmbd
 end
 
 create_makefile('lmdb_ext')
-
