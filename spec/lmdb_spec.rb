@@ -1,3 +1,4 @@
+# coding: binary
 require 'helper'
 
 describe LMDB do
@@ -217,9 +218,7 @@ describe LMDB do
 
     it 'should store binary' do
       bin1 = "\xAAx\BB\xCC1"
-      bin1.force_encoding(Encoding::BINARY) if bin1.respond_to?(:force_encoding)
       bin2 = "\xAAx\BB\xCC2"
-      bin2.force_encoding(Encoding::BINARY) if bin2.respond_to?(:force_encoding)
       db[bin1] = bin2
       db['key'] = bin2
       db[bin1].should == bin2
