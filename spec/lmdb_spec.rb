@@ -185,11 +185,19 @@ describe LMDB do
 
     it 'stores key/values in different transactions' do
       txn.transaction do |ctxn|
-        db.put(ctxn, 'key', 'value').should be_nil
+        db.put('key', 'value').should be_nil
+        db.put(ctxn, 'key2', 'value2').should be_nil
+        txn.transaction do |ctxn|
+          db.put('key3', 'value3').should be_nil
+        end
       end
 
       txn.transaction do |ctxn|
-        db.get(ctxn, 'key').should == 'value'
+        db.get('key').should == 'value'
+        db.get(ctxn, 'key2').should == 'value'
+        txn.transaction do |ctxn|
+          db.get('key3').should == 'value3'
+        end
       end
     end
 

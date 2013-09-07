@@ -19,10 +19,10 @@
     Data_Get_Struct(var, Environment, var_env);             \
     environment_check(var_env)
 
-#define TRANSACTION(var, var_txn)                                       \
+#define TRANSACTION(var, var_txn, no_children)                          \
     Transaction* var_txn;                                               \
     Data_Get_Struct(var, Transaction, var_txn);                         \
-    transaction_check(var_txn)
+    transaction_check(var_txn, no_children)
 
 #define DATABASE(var, var_db)                                   \
     Database* var_db;                                           \
@@ -42,7 +42,10 @@
             rb_raise(rb_eRuntimeError, "Wrong number of arguments");    \
         if (argc < 1 || TYPE(argv[0]) != T_DATA) {                      \
             MDB_txn* txn;                                               \
-            check(mdb_txn_begin(database->transaction->environment->env, database->transaction->txn, 0, &txn)); \
+            Transaction *parent = database->transaction;                \
+            while (parent->child)                                       \
+                parent = parent->child;                                 \
+            check(mdb_txn_begin(database->transaction->environment->env, parent, 0, &txn)); \
             WithTransactionArgs args = { database, txn, argc, argv  };  \
             int exception;                                              \
             VALUE result = rb_protect(RUBY_METHOD_FUNC(name##_with_transaction), (VALUE)&args, &exception); \
@@ -53,9 +56,9 @@
             mdb_txn_commit(txn);                                        \
             return result;                                              \
         }                                                               \
-        TRANSACTION(argv[0], transaction);                              \
+        TRANSACTION(argv[0], transaction, 1);                           \
         WithTransactionArgs args = { database, transaction->txn, argc - 1, argv + 1 }; \
-        return name##_with_transaction(&args);                           \
+        return name##_with_transaction(&args);                          \
     }                                                                   \
     static VALUE name##_with_transaction(WithTransactionArgs* a)
 
@@ -93,7 +96,7 @@ typedef struct Transaction {
     VALUE        venv;
     Environment* environment;
     VALUE        vparent;
-    Transaction* parent;
+    Transaction* parent, *child;
     int          refcount;
     MDB_txn*     txn;
 } Transaction;
@@ -117,10 +120,12 @@ typedef struct {
 
 static void database_check(Database*);
 static void cursor_check(Cursor*);
-static void transaction_check(Transaction*);
+static void transaction_check(Transaction*, int);
 static int transaction_active(Transaction*);
 static void transaction_deref(Transaction*);
 static void transaction_mark(Transaction*);
+static void transaction_do_abort(Transaction*);
+static void transaction_do_commit(Transaction*);
 
 /*-----------------------------------------------------------------------------
  * Helpers
@@ -326,12 +331,10 @@ static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
         int exception;
         VALUE result = rb_protect(rb_yield, vtxn, &exception);
         if (exception) {
-            mdb_txn_abort(transaction->txn);
-            transaction->txn = 0;
+            transaction_do_abort(transaction);
             rb_jump_tag(exception);
         }
-        mdb_txn_commit(transaction->txn);
-        transaction->txn = 0;
+        transaction_do_commit(transaction);
         return result;
     }
     return vtxn;
@@ -350,9 +353,11 @@ static int transaction_active(Transaction* transaction) {
     return 1;
 }
 
-static void transaction_check(Transaction* transaction) {
+static void transaction_check(Transaction* transaction, int no_children) {
     if (!transaction_active(transaction))
         rb_raise(cError, "Transaction is terminated");
+    if (no_children && transaction->child)
+        rb_raise(cError, "Transaction has an active child");
 }
 
 static void transaction_mark(Transaction* transaction) {
@@ -364,7 +369,7 @@ static void transaction_mark(Transaction* transaction) {
 static void transaction_deref(Transaction *transaction) {
     if (--transaction->refcount == 0) {
         if (transaction_active(transaction))
-            mdb_txn_abort(transaction->txn);
+            transaction_do_abort(transaction);
         if (transaction->parent)
             transaction_deref(transaction->parent);
         environment_deref(transaction->environment);
@@ -373,43 +378,55 @@ static void transaction_deref(Transaction *transaction) {
 }
 
 static VALUE transaction_environment(VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 0);
     return transaction->venv;
 }
 
 static VALUE transaction_parent(VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 0);
     return transaction->vparent;
 }
 
-static VALUE transaction_abort(VALUE self) {
-    TRANSACTION(self, transaction);
+static void transaction_do_abort(Transaction* transaction) {
     mdb_txn_abort(transaction->txn);
+    if (transaction->parent)
+        transaction->parent->child = 0;
     transaction->txn = 0;
+}
+
+static void transaction_do_commit(Transaction* transaction) {
+    mdb_txn_commit(transaction->txn);
+    if (transaction->parent)
+        transaction->parent->child = 0;
+    transaction->txn = 0;
+}
+
+static VALUE transaction_abort(VALUE self) {
+    TRANSACTION(self, transaction, 0);
+    transaction_do_abort(transaction);
     return Qnil;
 }
 
 static VALUE transaction_commit(VALUE self) {
-    TRANSACTION(self, transaction);
-    mdb_txn_commit(transaction->txn);
-    transaction->txn = 0;
+    TRANSACTION(self, transaction, 0);
+    transaction_do_commit(transaction);
     return Qnil;
 }
 
 static VALUE transaction_renew(VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 1);
     mdb_txn_renew(transaction->txn);
     return Qnil;
 }
 
 static VALUE transaction_reset(VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 1);
     mdb_txn_reset(transaction->txn);
     return Qnil;
 }
 
 static VALUE transaction_transaction(int argc, VALUE* argv, VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 1);
 
     VALUE readonly;
     rb_scan_args(argc, argv, "01", &readonly);
@@ -427,18 +444,19 @@ static VALUE transaction_transaction(int argc, VALUE* argv, VALUE self) {
     child->refcount = 1;
     child->venv = transaction->venv;
     child->environment = transaction->environment;
+
+    transaction->child = child;
+    ++transaction->refcount;
     ++child->environment->refcount;
 
     if (rb_block_given_p()) {
         int exception;
         VALUE result = rb_protect(rb_yield, vtxn, &exception);
         if (exception) {
-            mdb_txn_abort(child->txn);
-            child->txn = 0;
+            transaction_do_abort(child);
             rb_jump_tag(exception);
         }
-        mdb_txn_commit(child->txn);
-        child->txn = 0;
+        transaction_do_commit(child);
         return result;
     }
     return vtxn;
@@ -454,7 +472,7 @@ static VALUE database_transaction(VALUE self) {
 }
 
 static void database_check(Database* database) {
-    transaction_check(database->transaction);
+    transaction_check(database->transaction, 1);
     if (!database->open)
         rb_raise(cError, "Database is closed");
 }
@@ -471,7 +489,7 @@ static void database_mark(Database* database) {
 }
 
 static VALUE database_open(int argc, VALUE *argv, VALUE self) {
-    TRANSACTION(self, transaction);
+    TRANSACTION(self, transaction, 0);
 
     VALUE vname, vflags;
     rb_scan_args(argc, argv, "11", &vname, &vflags);
@@ -574,7 +592,7 @@ static void cursor_free(Cursor* cursor) {
 }
 
 static void cursor_check(Cursor* cursor) {
-    transaction_check(cursor->transaction);
+    transaction_check(cursor->transaction, 1);
     if (!cursor->cur)
         rb_raise(cError, "Cursor is closed");
 }
@@ -602,7 +620,7 @@ static VALUE database_cursor(int argc, VALUE* argv, VALUE self) {
         vtxn = transaction_transaction(database->vtxn, 0, 0);
     }
 
-    TRANSACTION(vtxn, transaction);
+    TRANSACTION(vtxn, transaction, 1);
 
     MDB_cursor* cur;
     check(mdb_cursor_open(transaction->txn, database->dbi, &cur));
