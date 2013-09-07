@@ -30,40 +30,61 @@ static void transaction_deref(Transaction* transaction) {
         }
 }
 
-static void transaction_check(Transaction* transaction) {
-        if (!transaction->txn)
-                rb_raise(cError, "Transaction is terminated");
-        ENVIRONMENT(transaction->env, environment);
-        if (NIL_P(environment->txn))
-                rb_raise(cError, "Transaction is not active");
-        TRANSACTION(environment->txn, txn);
-        if (txn != transaction)
-                rb_raise(cError, "Transaction is not active");
-}
-
 static void transaction_mark(Transaction* transaction) {
         rb_gc_mark(transaction->parent);
         rb_gc_mark(transaction->env);
 }
 
 static VALUE transaction_commit(VALUE self) {
-        TRANSACTION_UNCHECKED(self, transaction);
+        TRANSACTION(self, transaction);
         ENVIRONMENT(transaction->env, environment);
         if (!transaction->txn)
                 rb_raise(cError, "Transaction is terminated");
+
+        // Check nesting
+        VALUE p = environment->txn;
+        while (!NIL_P(p) && p != self) {
+                TRANSACTION(p, txn);
+                p = txn->parent;
+        }
+        if (p != self)
+                rb_raise(cError, "Transaction is not active");
+
         mdb_txn_commit(transaction->txn);
-        transaction->txn = 0;
+
+        p = environment->txn;
+        do {
+                TRANSACTION(p, txn);
+                txn->txn = 0;
+        } while (p != self);
+
         environment->txn = transaction->parent;
         return Qnil;
 }
 
 static VALUE transaction_abort(VALUE self) {
-        TRANSACTION_UNCHECKED(self, transaction);
+        TRANSACTION(self, transaction);
         ENVIRONMENT(transaction->env, environment);
+
+        // Check nesting
+        VALUE p = environment->txn;
+        while (!NIL_P(p) && p != self) {
+                TRANSACTION(p, txn);
+                p = txn->parent;
+        }
+        if (p != self)
+                rb_raise(cError, "Transaction is not active");
+
         if (!transaction->txn)
                 rb_raise(cError, "Transaction is terminated");
         mdb_txn_abort(transaction->txn);
-        transaction->txn = 0;
+
+        p = environment->txn;
+        do {
+                TRANSACTION(p, txn);
+                txn->txn = 0;
+        } while (p != self);
+
         environment->txn = transaction->parent;
         return Qnil;
 }
@@ -262,6 +283,8 @@ static MDB_txn* environment_get_txn(VALUE self) {
         if (NIL_P(environment->txn))
                 return 0;
         TRANSACTION(environment->txn, transaction);
+        if (!transaction->txn)
+                rb_raise(cError, "Transaction is terminated");
         return transaction->txn;
 }
 

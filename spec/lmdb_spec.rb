@@ -128,8 +128,8 @@ describe LMDB do
       env.transaction do |txn|
         txn.should be_instance_of(described_class::Transaction)
         env.transaction do |ctxn|
-          #ctxn.should be_instance_of(described_class::Transaction)
-          #ctxn.abort
+          ctxn.should be_instance_of(described_class::Transaction)
+          ctxn.abort
         end
       end
     end
@@ -153,15 +153,15 @@ describe LMDB do
       env.transaction do
         db.put('key', 'value').should be_nil
         db.put('key2', 'value2').should be_nil
-        txn.transaction do
+        env.transaction do
           db.put('key3', 'value3').should be_nil
         end
       end
 
       env.transaction do
         db.get('key').should == 'value'
-        db.get('key2').should == 'value'
-        txn.transaction do
+        db.get('key2').should == 'value2'
+        env.transaction do
           db.get('key3').should == 'value3'
         end
       end
@@ -169,11 +169,6 @@ describe LMDB do
 
     it 'should return stat' do
       db.stat.should be_instance_of(Hash)
-    end
-
-    it 'should close' do
-      db.close.should be_nil
-      proc { db.close }.should raise_error(LMDB::Error, /closed/)
     end
   end
 

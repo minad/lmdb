@@ -22,13 +22,9 @@
         Database* var_db;                       \
         Data_Get_Struct(var, Database, var_db);
 
-#define TRANSACTION_UNCHECKED(var, var_txn)             \
+#define TRANSACTION(var, var_txn)                       \
         Transaction* var_txn;                           \
         Data_Get_Struct(var, Transaction, var_txn)
-
-#define TRANSACTION(var, var_txn)                       \
-        TRANSACTION_UNCHECKED(var, var_txn);            \
-        transaction_check(var_txn)
 
 #define CURSOR(var, var_cur)                    \
         Cursor* var_cur;                        \
@@ -117,7 +113,6 @@ static VALUE environment_sync(int argc, VALUE *argv, VALUE self);
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self);
 static VALUE stat2hash(const MDB_stat* stat);
 static VALUE transaction_abort(VALUE self);
-static void transaction_check(Transaction* transaction);
 static VALUE transaction_commit(VALUE self);
 static void transaction_deref(Transaction* transaction);
 static void transaction_mark(Transaction* transaction);
