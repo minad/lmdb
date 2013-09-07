@@ -5,3 +5,4 @@
 *.mdb
 Makefile
 tmp/
+Gemfile.lock
