@@ -49,7 +49,6 @@ static VALUE transaction_abort(VALUE self) {
 
 static void transaction_finish(VALUE self, int commit) {
         TRANSACTION(self, transaction);
-        ENVIRONMENT(transaction->env, environment);
 
         if (!transaction->txn)
                 rb_raise(cError, "Transaction is terminated");
@@ -80,7 +79,7 @@ static void transaction_finish(VALUE self, int commit) {
         }
         transaction->txn = 0;
 
-        environment_set_active_txn(transaction->env, transaction->parent);
+        environment_set_active_txn(transaction->env, transaction->thread, transaction->parent);
 
         check(ret);
 }
@@ -108,7 +107,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         transaction->env = venv;
         transaction->txn = txn;
         transaction->thread = rb_thread_current();
-        environment_set_active_txn(venv, vtxn);
+        environment_set_active_txn(venv, transaction->thread, vtxn);
 
         if (!NIL_P(transaction->parent)) {
                 TRANSACTION(transaction->parent, parent);
@@ -118,7 +117,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         ++environment->refcount;
 
         int exception;
-        VALUE result = rb_protect(fn, NIL_P(arg) ? vtxn : arg, &exception);
+        VALUE ret = rb_protect(fn, NIL_P(arg) ? vtxn : arg, &exception);
 
         if (exception) {
                 if (vtxn == environment_active_txn(venv))
@@ -127,7 +126,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         }
         if (vtxn == environment_active_txn(venv))
                 transaction_commit(vtxn);
-        return result;
+        return ret;
 }
 
 static void environment_check(Environment* environment) {
@@ -145,10 +144,9 @@ static void environment_deref(Environment *environment) {
 
 
 static void environment_mark(Environment* environment) {
-        /*
         rb_gc_mark(environment->thread_txn_hash);
         rb_gc_mark(environment->txn_thread_hash);
-        */
+        rb_gc_mark(environment->mutex);
 }
 
 static VALUE environment_close(VALUE self) {
@@ -159,9 +157,9 @@ static VALUE environment_close(VALUE self) {
 }
 
 static VALUE stat2hash(const MDB_stat* stat) {
-        VALUE result = rb_hash_new();
+        VALUE ret = rb_hash_new();
 
-#define STAT_SET(name) rb_hash_aset(result, ID2SYM(rb_intern(#name)), INT2NUM(stat->ms_##name))
+#define STAT_SET(name) rb_hash_aset(ret, ID2SYM(rb_intern(#name)), INT2NUM(stat->ms_##name))
         STAT_SET(psize);
         STAT_SET(depth);
         STAT_SET(branch_pages);
@@ -170,7 +168,7 @@ static VALUE stat2hash(const MDB_stat* stat) {
         STAT_SET(entries);
 #undef STAT_SET
 
-        return result;
+        return ret;
 }
 
 static VALUE environment_stat(VALUE self) {
@@ -186,9 +184,9 @@ static VALUE environment_info(VALUE self) {
         ENVIRONMENT(self, environment);
         check(mdb_env_info(environment->env, &info));
 
-        VALUE result = rb_hash_new();
+        VALUE ret = rb_hash_new();
 
-#define INFO_SET(name) rb_hash_aset(result, ID2SYM(rb_intern(#name)), INT2NUM((size_t)info.me_##name));
+#define INFO_SET(name) rb_hash_aset(ret, ID2SYM(rb_intern(#name)), INT2NUM((size_t)info.me_##name));
         INFO_SET(mapaddr);
         INFO_SET(mapsize);
         INFO_SET(last_pgno);
@@ -197,7 +195,7 @@ static VALUE environment_info(VALUE self) {
         INFO_SET(numreaders);
 #undef INFO_SET
 
-        return result;
+        return ret;
 }
 
 static VALUE environment_copy(VALUE self, VALUE path) {
@@ -252,7 +250,9 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
         VALUE venv = Data_Make_Struct(cEnvironment, Environment, environment_mark, environment_deref, environment);
         environment->env = env;
         environment->refcount = 1;
-        environment->__txn = Qnil;
+        environment->thread_txn_hash = rb_hash_new();
+        environment->txn_thread_hash = rb_hash_new();
+        environment->mutex = rb_mutex_new();
 
         if (maxreaders > 0)
                 check(mdb_env_set_maxreaders(environment->env, maxreaders));
@@ -292,26 +292,31 @@ static VALUE environment_set_flags(VALUE self, VALUE vflags) {
 
 static VALUE environment_active_txn(VALUE self) {
         ENVIRONMENT(self, environment);
-        /*
-        return rb_hash_aref(environment->thread_txn_hash, rb_thread_current());
-        */
-        return environment->__txn;
+
+        rb_mutex_lock(environment->mutex);
+        VALUE ret = rb_hash_aref(environment->thread_txn_hash, rb_thread_current());
+        rb_mutex_unlock(environment->mutex);
+
+        return ret;
 }
 
-static void environment_set_active_txn(VALUE self, VALUE txn) {
+static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn) {
         ENVIRONMENT(self, environment);
-        environment->__txn = txn;
-        /*
-        VALUE thread = rb_thread_current();
 
-        VALUE old_txn = rb_hash_delete(environment->thread_txn_hash, thread);
-        if (!NIL_P(old_txn))
-                rb_hash_delete(environment->txn_thread_hash, old_txn);
-        if (!NIL_P(txn)) {
+        rb_mutex_lock(environment->mutex);
+
+        if (NIL_P(txn)) {
+                VALUE oldtxn = rb_hash_aref(environment->thread_txn_hash, thread);
+                if (!NIL_P(oldtxn)) {
+                        rb_hash_delete(environment->thread_txn_hash, thread);
+                        rb_hash_delete(environment->txn_thread_hash, oldtxn);
+                }
+        } else {
                 rb_hash_aset(environment->txn_thread_hash, txn, thread);
                 rb_hash_aset(environment->thread_txn_hash, thread, txn);
         }
-        */
+
+        rb_mutex_unlock(environment->mutex);
 }
 
 
@@ -508,13 +513,13 @@ static VALUE database_cursor(VALUE self) {
 
         if (rb_block_given_p()) {
                 int exception;
-                VALUE result = rb_protect(rb_yield, vcur, &exception);
+                VALUE ret = rb_protect(rb_yield, vcur, &exception);
                 if (exception) {
                         cursor_close(vcur);
                         rb_jump_tag(exception);
                 }
                 cursor_close(vcur);
-                return result;
+                return ret;
         }
 
         return vcur;

@@ -44,7 +44,9 @@ typedef struct Transaction {
 
 typedef struct {
         MDB_env* env;
-        VALUE    __txn;
+        VALUE    thread_txn_hash;
+        VALUE    txn_thread_hash;
+        VALUE    mutex;
         int      refcount;
 } Environment;
 
@@ -111,7 +113,7 @@ static VALUE environment_info(VALUE self);
 static void environment_mark(Environment* environment);
 static VALUE environment_open(int argc, VALUE *argv, VALUE klass);
 static VALUE environment_path(VALUE self);
-static void environment_set_active_txn(VALUE self, VALUE txn);
+static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn);
 static VALUE environment_set_flags(VALUE self, VALUE vflags);
 static VALUE environment_stat(VALUE self);
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self);
