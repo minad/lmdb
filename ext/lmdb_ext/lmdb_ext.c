@@ -213,7 +213,7 @@ static VALUE environment_sync(int argc, VALUE *argv, VALUE self) {
         return Qnil;
 }
 
-static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
+static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         VALUE path, options;
         rb_scan_args(argc, argv, "11", &path, &options);
 
@@ -619,7 +619,7 @@ void Init_lmdb_ext() {
 
         mLMDB = rb_define_module("LMDB");
         rb_define_const(mLMDB, "VERSION", rb_str_new2(MDB_VERSION_STRING));
-        rb_define_singleton_method(mLMDB, "open", environment_open, -1);
+        rb_define_singleton_method(mLMDB, "new", environment_new, -1);
 
 #define NUM_CONST(name) rb_define_const(mLMDB, #name, INT2NUM(MDB_##name))
 
@@ -662,8 +662,7 @@ void Init_lmdb_ext() {
 #undef ERROR
 
         cEnvironment = rb_define_class_under(mLMDB, "Environment", rb_cObject);
-        rb_undef_method(rb_singleton_class(cEnvironment), "new");
-        rb_define_singleton_method(cEnvironment, "open", environment_open, -1);
+        rb_define_singleton_method(cEnvironment, "new", environment_new, -1);
         rb_define_method(cEnvironment, "database", environment_database, -1);
         rb_define_method(cEnvironment, "active_txn", environment_active_txn, 0);
         rb_define_method(cEnvironment, "close", environment_close, 0);

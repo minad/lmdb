@@ -2,7 +2,7 @@
 require 'helper'
 
 describe LMDB do
-  let(:env) { LMDB.open(path) }
+  let(:env) { LMDB.new(path) }
   after     { env.close rescue nil }
 
   let(:db)  { env.database }
@@ -49,22 +49,22 @@ describe LMDB do
       subject.flags.should be_instance_of(Fixnum)
     end
 
-    describe 'open' do
+    describe 'new' do
       it 'returns environment' do
-        env = LMDB::Environment.open(path)
+        env = LMDB::Environment.new(path)
         env.should be_instance_of(described_class::Environment)
         env.close
       end
 
       it 'accepts block' do
-        LMDB::Environment.open(path) do |env|
+        LMDB::Environment.new(path) do |env|
           env.should be_instance_of(described_class::Environment)
           42
         end.should == 42
       end
 
       it 'accepts options' do
-        env = LMDB::Environment.open(path, :flags => LMDB::NOSYNC, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
+        env = LMDB::Environment.new(path, :flags => LMDB::NOSYNC, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
         env.should be_instance_of(described_class::Environment)
         env.info[:maxreaders].should == 777
         env.info[:mapsize].should == 111111
