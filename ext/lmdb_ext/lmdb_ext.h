@@ -4,16 +4,6 @@
 #include "ruby.h"
 #include "lmdb.h"
 
-#define ENV_FLAGS (                             \
-                MDB_FIXEDMAP    |               \
-                MDB_NOSUBDIR    |               \
-                MDB_NOSYNC      |               \
-                MDB_RDONLY      |               \
-                MDB_NOMETASYNC  |               \
-                MDB_WRITEMAP    |               \
-                MDB_MAPASYNC    |               \
-                MDB_NOTLS)
-
 #define ENVIRONMENT(var, var_env)                       \
         Environment* var_env;                           \
         Data_Get_Struct(var, Environment, var_env);     \
@@ -46,7 +36,6 @@ typedef struct {
         MDB_env* env;
         VALUE    thread_txn_hash;
         VALUE    txn_thread_hash;
-        VALUE    mutex;
         int      refcount;
 } Environment;
 

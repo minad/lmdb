@@ -45,8 +45,9 @@ describe LMDB do
   describe LMDB::Environment do
     subject { env }
 
-    its(:path)  { should == path }
-    its(:flags) { should == 0 }
+    it 'should return flags' do
+      subject.flags.should be_instance_of(Fixnum)
+    end
 
     describe 'open' do
       it 'returns environment' do
@@ -105,11 +106,13 @@ describe LMDB do
     end
 
     it 'should accept custom flags' do
-      (subject.flags = LMDB::NOSYNC).should == LMDB::NOSYNC
-      subject.flags.should == LMDB::NOSYNC
+      (subject.flags & LMDB::NOSYNC).should == 0
 
-      (subject.flags = 0).should == 0
-      subject.flags.should == 0
+      subject.set_flags LMDB::NOSYNC
+      (subject.flags & LMDB::NOSYNC).should == LMDB::NOSYNC
+
+      subject.clear_flags LMDB::NOSYNC
+      (subject.flags & LMDB::NOSYNC).should == 0
     end
 
     describe 'transaction' do
@@ -187,6 +190,20 @@ describe LMDB do
 
   describe LMDB::Database do
     subject { db }
+
+    it 'should support named databases' do
+      main = env.database
+      db1 = env.database('db1', LMDB::CREATE)
+      db2 = env.database('db2', LMDB::CREATE)
+
+      main['key'] = '1'
+      db1['key'] = '2'
+      db2['key'] = '3'
+
+      main['key'].should == '1'
+      db1['key'].should == '2'
+      db2['key'].should == '3'
+    end
 
     it 'should get/put data' do
       subject.get('cat').should be_nil

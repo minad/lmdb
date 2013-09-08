@@ -146,7 +146,6 @@ static void environment_deref(Environment *environment) {
 static void environment_mark(Environment* environment) {
         rb_gc_mark(environment->thread_txn_hash);
         rb_gc_mark(environment->txn_thread_hash);
-        rb_gc_mark(environment->mutex);
 }
 
 static VALUE environment_close(VALUE self) {
@@ -218,7 +217,7 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
         VALUE path, options;
         rb_scan_args(argc, argv, "11", &path, &options);
 
-        int flags = 0, maxreaders = -1, maxdbs = 10;
+        int flags = MDB_NOTLS, maxreaders = -1, maxdbs = 10;
         size_t mapsize = 0;
         mode_t mode = 0755;
         if (!NIL_P(options)) {
@@ -252,7 +251,6 @@ static VALUE environment_open(int argc, VALUE *argv, VALUE klass) {
         environment->refcount = 1;
         environment->thread_txn_hash = rb_hash_new();
         environment->txn_thread_hash = rb_hash_new();
-        environment->mutex = rb_mutex_new();
 
         if (maxreaders > 0)
                 check(mdb_env_set_maxreaders(environment->env, maxreaders));
@@ -271,7 +269,7 @@ static VALUE environment_flags(VALUE self) {
         unsigned int flags;
         ENVIRONMENT(self, environment);
         check(mdb_env_get_flags(environment->env, &flags));
-        return INT2NUM(flags & ENV_FLAGS);
+        return INT2NUM(flags);
 }
 
 static VALUE environment_path(VALUE self) {
@@ -282,28 +280,24 @@ static VALUE environment_path(VALUE self) {
 }
 
 static VALUE environment_set_flags(VALUE self, VALUE vflags) {
-        unsigned int flags = NUM2INT(vflags), oldflags;
         ENVIRONMENT(self, environment);
-        check(mdb_env_get_flags(environment->env, &oldflags));
-        check(mdb_env_set_flags(environment->env, oldflags & ENV_FLAGS, 0));
-        check(mdb_env_set_flags(environment->env, flags, 1));
-        return environment_flags(self);
+        check(mdb_env_set_flags(environment->env, NUM2INT(vflags), 1));
+        return Qnil;
+}
+
+static VALUE environment_clear_flags(VALUE self, VALUE vflags) {
+        ENVIRONMENT(self, environment);
+        check(mdb_env_set_flags(environment->env, NUM2INT(vflags), 0));
+        return Qnil;
 }
 
 static VALUE environment_active_txn(VALUE self) {
         ENVIRONMENT(self, environment);
-
-        rb_mutex_lock(environment->mutex);
-        VALUE ret = rb_hash_aref(environment->thread_txn_hash, rb_thread_current());
-        rb_mutex_unlock(environment->mutex);
-
-        return ret;
+        return rb_hash_aref(environment->thread_txn_hash, rb_thread_current());
 }
 
 static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn) {
         ENVIRONMENT(self, environment);
-
-        rb_mutex_lock(environment->mutex);
 
         if (NIL_P(txn)) {
                 VALUE oldtxn = rb_hash_aref(environment->thread_txn_hash, thread);
@@ -315,8 +309,6 @@ static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn) {
                 rb_hash_aset(environment->txn_thread_hash, txn, thread);
                 rb_hash_aset(environment->thread_txn_hash, thread, txn);
         }
-
-        rb_mutex_unlock(environment->mutex);
 }
 
 
@@ -679,7 +671,8 @@ void Init_lmdb_ext() {
         rb_define_method(cEnvironment, "info", environment_info, 0);
         rb_define_method(cEnvironment, "copy", environment_copy, 1);
         rb_define_method(cEnvironment, "sync", environment_sync, -1);
-        rb_define_method(cEnvironment, "flags=", environment_set_flags, 1);
+        rb_define_method(cEnvironment, "set_flags", environment_set_flags, 1);
+        rb_define_method(cEnvironment, "clear_flags", environment_clear_flags, 1);
         rb_define_method(cEnvironment, "flags", environment_flags, 0);
         rb_define_method(cEnvironment, "path", environment_path, 0);
         rb_define_method(cEnvironment, "transaction", environment_transaction, -1);
