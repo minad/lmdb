@@ -1,9 +1,12 @@
 # -*- encoding: utf-8 -*-
+require File.dirname(__FILE__) + '/lib/lmdb/version'
+require 'date'
 
 Gem::Specification.new do |s|
   s.name        = File.basename(__FILE__, '.gemspec')
-  s.version     = '0.2.0'
+  s.version     = LMDB::VERSION
   s.platform    = Gem::Platform::RUBY
+  s.date        = Date.today.to_s
   s.licenses    = ['MIT']
   s.summary     = 'Ruby bindings to Lightning MDB'
   s.email       = 'mail@daniel-mendler.de'
