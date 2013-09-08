@@ -1,0 +1,7 @@
+FLAG(REVERSEKEY, reversekey)
+FLAG(DUPSORT, dupsort)
+FLAG(INTEGERKEY, integerkey)
+FLAG(DUPFIXED, dupfixed)
+FLAG(INTEGERDUP, integerdup)
+FLAG(REVERSEDUP, reversedup)
+FLAG(CREATE, create)

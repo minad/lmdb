@@ -8,45 +8,18 @@ describe LMDB do
   let(:db)  { env.database }
 
   it 'has version constants' do
-    LMDB::VERSION_MAJOR.should be_instance_of(Fixnum)
-    LMDB::VERSION_MINOR.should be_instance_of(Fixnum)
-    LMDB::VERSION_PATCH.should be_instance_of(Fixnum)
+    LMDB::LIB_VERSION_MAJOR.should be_instance_of(Fixnum)
+    LMDB::LIB_VERSION_MINOR.should be_instance_of(Fixnum)
+    LMDB::LIB_VERSION_PATCH.should be_instance_of(Fixnum)
+    LMDB::LIB_VERSION.should be_instance_of(String)
     LMDB::VERSION.should be_instance_of(String)
-  end
-
-  it 'has environment flags' do
-    LMDB::FIXEDMAP.should be_instance_of(Fixnum)
-    LMDB::NOSUBDIR.should be_instance_of(Fixnum)
-    LMDB::NOSYNC.should be_instance_of(Fixnum)
-    LMDB::RDONLY.should be_instance_of(Fixnum)
-    LMDB::NOMETASYNC.should be_instance_of(Fixnum)
-    LMDB::WRITEMAP.should be_instance_of(Fixnum)
-    LMDB::MAPASYNC.should be_instance_of(Fixnum)
-    LMDB::NOTLS.should be_instance_of(Fixnum)
-  end
-
-  it 'has database flags' do
-    LMDB::REVERSEKEY.should be_instance_of(Fixnum)
-    LMDB::DUPSORT.should be_instance_of(Fixnum)
-    LMDB::INTEGERKEY.should be_instance_of(Fixnum)
-    LMDB::DUPFIXED.should be_instance_of(Fixnum)
-    LMDB::INTEGERDUP.should be_instance_of(Fixnum)
-    LMDB::REVERSEDUP.should be_instance_of(Fixnum)
-    LMDB::CREATE.should be_instance_of(Fixnum)
-    LMDB::NOOVERWRITE.should be_instance_of(Fixnum)
-    LMDB::NODUPDATA.should be_instance_of(Fixnum)
-    LMDB::CURRENT.should be_instance_of(Fixnum)
-    LMDB::RESERVE.should be_instance_of(Fixnum)
-    LMDB::APPEND.should be_instance_of(Fixnum)
-    LMDB::APPENDDUP.should be_instance_of(Fixnum)
-    LMDB::MULTIPLE.should be_instance_of(Fixnum)
   end
 
   describe LMDB::Environment do
     subject { env }
 
     it 'should return flags' do
-      subject.flags.should be_instance_of(Fixnum)
+      subject.flags.should be_instance_of(Array)
     end
 
     describe 'new' do
@@ -64,10 +37,15 @@ describe LMDB do
       end
 
       it 'accepts options' do
-        env = LMDB::Environment.new(path, :flags => LMDB::NOSYNC, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
+        env = LMDB::Environment.new(path, :nosync => true, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
         env.should be_instance_of(described_class::Environment)
         env.info[:maxreaders].should == 777
         env.info[:mapsize].should == 111111
+        env.flags.should include(:nosync)
+        env.close
+
+        env = LMDB::Environment.new(path, :nosync => false)
+        env.flags.should_not include(:nosync)
         env.close
       end
     end
@@ -106,13 +84,13 @@ describe LMDB do
     end
 
     it 'should accept custom flags' do
-      (subject.flags & LMDB::NOSYNC).should == 0
+      subject.flags.should_not include(:nosync)
 
-      subject.set_flags LMDB::NOSYNC
-      (subject.flags & LMDB::NOSYNC).should == LMDB::NOSYNC
+      subject.set_flags :nosync
+      subject.flags.should include(:nosync)
 
-      subject.clear_flags LMDB::NOSYNC
-      (subject.flags & LMDB::NOSYNC).should == 0
+      subject.clear_flags :nosync
+      subject.flags.should_not include(:nosync)
     end
 
     describe 'transaction' do
@@ -193,8 +171,8 @@ describe LMDB do
 
     it 'should support named databases' do
       main = env.database
-      db1 = env.database('db1', LMDB::CREATE)
-      db2 = env.database('db2', LMDB::CREATE)
+      db1 = env.database('db1', :create => true)
+      db2 = env.database('db2', :create => true)
 
       main['key'] = '1'
       db1['key'] = '2'

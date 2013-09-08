@@ -213,34 +213,43 @@ static VALUE environment_sync(int argc, VALUE *argv, VALUE self) {
         return Qnil;
 }
 
-static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
-        VALUE path, options;
-        rb_scan_args(argc, argv, "11", &path, &options);
+static int environment_options(VALUE key, VALUE value, EnvironmentOptions* options) {
+        ID id = rb_to_id(key);
 
-        int flags = MDB_NOTLS, maxreaders = -1, maxdbs = 10;
-        size_t mapsize = 0;
-        mode_t mode = 0755;
-        if (!NIL_P(options)) {
-                VALUE value = rb_hash_aref(options, ID2SYM(rb_intern("flags")));
-                if (!NIL_P(value))
-                        flags = NUM2INT(value);
+        if (id == rb_intern("mode"))
+                options->mode = NUM2INT(value);
+        else if (id == rb_intern("maxreaders"))
+                options->maxreaders = NUM2INT(value);
+        else if (id == rb_intern("maxdbs"))
+                options->maxdbs = NUM2INT(value);
+        else if (id == rb_intern("mapsize"))
+                options->mapsize = NUM2SSIZET(value);
 
-                value = rb_hash_aref(options, ID2SYM(rb_intern("mode")));
-                if (!NIL_P(value))
-                        mode = NUM2INT(value);
+#define FLAG(const, name) else if (id == rb_intern(#name)) { if (RTEST(value)) { options->flags |= MDB_##const; } }
+#include "env_flags.h"
+#undef FLAG
 
-                value = rb_hash_aref(options, ID2SYM(rb_intern("maxreaders")));
-                if (!NIL_P(value))
-                        maxreaders = NUM2INT(value);
-
-                value = rb_hash_aref(options, ID2SYM(rb_intern("maxdbs")));
-                if (!NIL_P(value))
-                        maxdbs = NUM2INT(value);
-
-                value = rb_hash_aref(options, ID2SYM(rb_intern("mapsize")));
-                if (!NIL_P(value))
-                        mapsize = NUM2SIZET(value);
+        else {
+                VALUE s = rb_inspect(key);
+                rb_raise(cError, "Invalid option %s", StringValueCStr(s));
         }
+
+        return 0;
+}
+
+static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
+        VALUE path, option_hash;
+        rb_scan_args(argc, argv, "1:", &path, &option_hash);
+
+        EnvironmentOptions options = {
+                .flags = MDB_NOTLS,
+                .maxreaders = -1,
+                .maxdbs = 128,
+                .mapsize = 0,
+                .mode = 0755,
+        };
+        if (!NIL_P(option_hash))
+                rb_hash_foreach(option_hash, environment_options, (VALUE)&options);
 
         MDB_env* env;
         check(mdb_env_create(&env));
@@ -252,13 +261,14 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         environment->thread_txn_hash = rb_hash_new();
         environment->txn_thread_hash = rb_hash_new();
 
-        if (maxreaders > 0)
-                check(mdb_env_set_maxreaders(environment->env, maxreaders));
-        if (mapsize > 0)
-                check(mdb_env_set_mapsize(environment->env, mapsize));
+        if (options.maxreaders > 0)
+                check(mdb_env_set_maxreaders(env, options.maxreaders));
+        if (options.mapsize > 0)
+                check(mdb_env_set_mapsize(env, options.mapsize));
 
-        check(mdb_env_set_maxdbs(environment->env, maxdbs <= 0 ? 1 : maxdbs));
-        check(mdb_env_open(environment->env, StringValueCStr(path), flags, mode));
+        check(mdb_env_set_maxdbs(env, options.maxdbs <= 0 ? 1 : options.maxdbs));
+        check(mdb_env_open(env, StringValueCStr(path), options.flags, options.mode));
+
         if (rb_block_given_p())
                 return rb_ensure(rb_yield, venv, environment_close, venv);
 
@@ -269,7 +279,13 @@ static VALUE environment_flags(VALUE self) {
         unsigned int flags;
         ENVIRONMENT(self, environment);
         check(mdb_env_get_flags(environment->env, &flags));
-        return INT2NUM(flags);
+
+        VALUE ret = rb_ary_new();
+#define FLAG(const, name) if (flags & MDB_##const) rb_ary_push(ret, ID2SYM(rb_intern(#name)));
+#include "env_flags.h"
+#undef FLAG
+
+        return ret;
 }
 
 static VALUE environment_path(VALUE self) {
@@ -279,15 +295,30 @@ static VALUE environment_path(VALUE self) {
         return rb_str_new2(path);
 }
 
-static VALUE environment_set_flags(VALUE self, VALUE vflags) {
+static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set) {
         ENVIRONMENT(self, environment);
-        check(mdb_env_set_flags(environment->env, NUM2INT(vflags), 1));
+
+        int i;
+        for (i = 0; i < argc; ++i) {
+                ID id = rb_to_id(argv[i]);
+
+                if (0) {}
+#define FLAG(const, name) else if (id == rb_intern(#name)) check(mdb_env_set_flags(environment->env, MDB_##const, set));
+#include "env_flags.h"
+#undef FLAG
+                else
+                        rb_raise(cError, "Invalid option %s", StringValueCStr(argv[i]));
+        }
         return Qnil;
 }
 
-static VALUE environment_clear_flags(VALUE self, VALUE vflags) {
-        ENVIRONMENT(self, environment);
-        check(mdb_env_set_flags(environment->env, NUM2INT(vflags), 0));
+static VALUE environment_set_flags(int argc, VALUE* argv, VALUE self) {
+        environment_change_flags(argc, argv, self, 1);
+        return Qnil;
+}
+
+static VALUE environment_clear_flags(int argc, VALUE* argv, VALUE self) {
+        environment_change_flags(argc, argv, self, 0);
         return Qnil;
 }
 
@@ -353,16 +384,26 @@ static void database_mark(Database* database) {
         rb_gc_mark(database->env);
 }
 
+#define METHOD database_flags
+#define FILE "dbi_flags.h"
+#include "flag_parser.h"
+#undef METHOD
+#undef FILE
+
 static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
         if (!active_txn(self))
                 return call_with_transaction(self, self, "database", argc, argv, 0);
 
-        VALUE vname, vflags;
-        rb_scan_args(argc, argv, "02", &vname, &vflags);
+        VALUE name, option_hash;
+        rb_scan_args(argc, argv, "01:", &name, &option_hash);
+
+        int flags = 0;
+        if (!NIL_P(option_hash))
+                rb_hash_foreach(option_hash, database_flags, (VALUE)&flags);
 
         MDB_dbi dbi;
-        check(mdb_dbi_open(need_txn(self), NIL_P(vname) ? 0 : StringValueCStr(vname), NIL_P(vflags) ? 0 : NUM2INT(vflags), &dbi));
+        check(mdb_dbi_open(need_txn(self), NIL_P(name) ? 0 : StringValueCStr(name), flags, &dbi));
 
         Database* database;
         VALUE vdb = Data_Make_Struct(cDatabase, Database, database_mark, database_deref, database);
@@ -417,13 +458,23 @@ static VALUE database_get(VALUE self, VALUE vkey) {
         return rb_str_new(value.mv_data, value.mv_size);
 }
 
+#define METHOD database_put_flags
+#define FILE "put_flags.h"
+#include "flag_parser.h"
+#undef METHOD
+#undef FILE
+
 static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
                 return call_with_transaction(database->env, self, "put", argc, argv, 0);
 
-        VALUE vkey, vflags, vval;
-        rb_scan_args(argc, argv, "21", &vkey, &vval, &vflags);
+        VALUE vkey, vval, option_hash;
+        rb_scan_args(argc, argv, "2:", &vkey, &vval, &option_hash);
+
+        int flags = 0;
+        if (!NIL_P(option_hash))
+                rb_hash_foreach(option_hash, database_put_flags, (VALUE)&flags);
 
         vkey = StringValue(vkey);
         vval = StringValue(vval);
@@ -434,7 +485,7 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         value.mv_size = RSTRING_LEN(vval);
         value.mv_data = RSTRING_PTR(vval);
 
-        check(mdb_put(need_txn(database->env), database->dbi, &key, &value, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
+        check(mdb_put(need_txn(database->env), database->dbi, &key, &value, flags));
         return Qnil;
 }
 
@@ -580,11 +631,21 @@ static VALUE cursor_get(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+#define METHOD cursor_put_flags
+#define FILE "cursor_put_flags.h"
+#include "flag_parser.h"
+#undef METHOD
+#undef FILE
+
 static VALUE cursor_put(int argc, VALUE* argv, VALUE self) {
         CURSOR(self, cursor);
 
-        VALUE vkey, vflags, vval;
-        rb_scan_args(argc, argv, "21", &vkey, &vval, &vflags);
+        VALUE vkey, vval, option_hash;
+        rb_scan_args(argc, argv, "2:", &vkey, &vval, &option_hash);
+
+        int flags = 0;
+        if (!NIL_P(option_hash))
+                rb_hash_foreach(option_hash, cursor_put_flags, (VALUE)&flags);
 
         vkey = StringValue(vkey);
         vval = StringValue(vval);
@@ -595,15 +656,27 @@ static VALUE cursor_put(int argc, VALUE* argv, VALUE self) {
         value.mv_size = RSTRING_LEN(vval);
         value.mv_data = RSTRING_PTR(vval);
 
-        check(mdb_cursor_put(cursor->cur, &key, &value, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
+        check(mdb_cursor_put(cursor->cur, &key, &value, flags));
         return Qnil;
 }
 
+#define METHOD cursor_delete_flags
+#define FILE "cursor_delete_flags.h"
+#include "flag_parser.h"
+#undef METHOD
+#undef FILE
+
 static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
         CURSOR(self, cursor);
-        VALUE vflags;
-        rb_scan_args(argc, argv, "01", &vflags);
-        check(mdb_cursor_del(cursor->cur, NIL_P(vflags) ? 0 : NUM2INT(vflags)));
+
+        VALUE option_hash;
+        rb_scan_args(argc, argv, ":", &option_hash);
+
+        int flags = 0;
+        if (!NIL_P(option_hash))
+                rb_hash_foreach(option_hash, cursor_delete_flags, (VALUE)&flags);
+
+        check(mdb_cursor_del(cursor->cur, flags));
         return Qnil;
 }
 
@@ -618,43 +691,14 @@ void Init_lmdb_ext() {
         VALUE mLMDB;
 
         mLMDB = rb_define_module("LMDB");
-        rb_define_const(mLMDB, "VERSION", rb_str_new2(MDB_VERSION_STRING));
+        rb_define_const(mLMDB, "LIB_VERSION", rb_str_new2(MDB_VERSION_STRING));
         rb_define_singleton_method(mLMDB, "new", environment_new, -1);
 
-#define NUM_CONST(name) rb_define_const(mLMDB, #name, INT2NUM(MDB_##name))
-
-        // Versions
-        NUM_CONST(VERSION_MAJOR);
-        NUM_CONST(VERSION_MINOR);
-        NUM_CONST(VERSION_PATCH);
-
-        // Environment flags
-        NUM_CONST(FIXEDMAP);
-        NUM_CONST(NOSUBDIR);
-        NUM_CONST(NOSYNC);
-        NUM_CONST(RDONLY);
-        NUM_CONST(NOMETASYNC);
-        NUM_CONST(WRITEMAP);
-        NUM_CONST(MAPASYNC);
-        NUM_CONST(NOTLS);
-
-        // Database flags
-        NUM_CONST(REVERSEKEY);
-        NUM_CONST(DUPSORT);
-        NUM_CONST(INTEGERKEY);
-        NUM_CONST(DUPFIXED);
-        NUM_CONST(INTEGERDUP);
-        NUM_CONST(REVERSEDUP);
-        NUM_CONST(CREATE);
-
-        // Write flags
-        NUM_CONST(NOOVERWRITE);
-        NUM_CONST(NODUPDATA);
-        NUM_CONST(CURRENT);
-        NUM_CONST(RESERVE);
-        NUM_CONST(APPEND);
-        NUM_CONST(APPENDDUP);
-        NUM_CONST(MULTIPLE);
+#define VERSION_CONST(name) rb_define_const(mLMDB, "LIB_VERSION_"#name, INT2NUM(MDB_VERSION_##name));
+        VERSION_CONST(MAJOR)
+        VERSION_CONST(MINOR)
+        VERSION_CONST(PATCH)
+#undef VERSION_CONST
 
         cError = rb_define_class_under(mLMDB, "Error", rb_eRuntimeError);
 #define ERROR(name) cError_##name = rb_define_class_under(cError, #name, cError);
@@ -670,8 +714,8 @@ void Init_lmdb_ext() {
         rb_define_method(cEnvironment, "info", environment_info, 0);
         rb_define_method(cEnvironment, "copy", environment_copy, 1);
         rb_define_method(cEnvironment, "sync", environment_sync, -1);
-        rb_define_method(cEnvironment, "set_flags", environment_set_flags, 1);
-        rb_define_method(cEnvironment, "clear_flags", environment_clear_flags, 1);
+        rb_define_method(cEnvironment, "set_flags", environment_set_flags, -1);
+        rb_define_method(cEnvironment, "clear_flags", environment_clear_flags, -1);
         rb_define_method(cEnvironment, "flags", environment_flags, 0);
         rb_define_method(cEnvironment, "path", environment_path, 0);
         rb_define_method(cEnvironment, "transaction", environment_transaction, -1);

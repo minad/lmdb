@@ -1,0 +1,8 @@
+FLAG(FIXEDMAP, fixedmap)
+FLAG(NOSUBDIR, nosubdir)
+FLAG(NOSYNC, nosync)
+FLAG(RDONLY, rdonly)
+FLAG(NOMETASYNC, nometasync)
+FLAG(WRITEMAP, writemap)
+FLAG(MAPASYNC, mapasync)
+FLAG(NOTLS, notls)

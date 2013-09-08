@@ -1,0 +1,5 @@
+FLAG(NOOVERWRITE, nooverwrite)
+FLAG(NODUPDATA, nodupdata)
+FLAG(CURRENT, current)
+FLAG(APPEND, append)
+FLAG(APPENDDUP, appenddup)

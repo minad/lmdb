@@ -57,6 +57,14 @@ typedef struct {
         const VALUE* argv;
 } HelperArgs;
 
+typedef struct {
+        mode_t mode;
+        int    flags;
+        int    maxreaders;
+        int    maxdbs;
+        size_t mapsize;
+} EnvironmentOptions;
+
 static VALUE cEnvironment, cDatabase, cTransaction, cCursor, cError;
 
 #define ERROR(name) static VALUE cError_##name;
@@ -92,7 +100,9 @@ static void database_mark(Database* database);
 static VALUE database_put(int argc, VALUE *argv, VALUE self);
 static VALUE database_stat(VALUE self);
 static VALUE environment_active_txn(VALUE self);
+static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set);
 static void environment_check(Environment* environment);
+static VALUE environment_clear_flags(int argc, VALUE* argv, VALUE self);
 static VALUE environment_close(VALUE self);
 static VALUE environment_copy(VALUE self, VALUE path);
 static VALUE environment_database(int argc, VALUE *argv, VALUE self);
@@ -100,10 +110,11 @@ static void environment_deref(Environment *environment);
 static VALUE environment_flags(VALUE self);
 static VALUE environment_info(VALUE self);
 static void environment_mark(Environment* environment);
-static VALUE environment_open(int argc, VALUE *argv, VALUE klass);
+static VALUE environment_new(int argc, VALUE *argv, VALUE klass);
+static int environment_options(VALUE key, VALUE value, EnvironmentOptions* options);
 static VALUE environment_path(VALUE self);
 static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn);
-static VALUE environment_set_flags(VALUE self, VALUE vflags);
+static VALUE environment_set_flags(int argc, VALUE* argv, VALUE self);
 static VALUE environment_stat(VALUE self);
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self);
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self);
