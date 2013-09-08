@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
   s.summary     = 'Ruby bindings to Lightning MDB'
   s.email       = 'mail@daniel-mendler.de'
   s.homepage    = 'https://github.com/minad/lmdb'
-  s.description = 'imdb is a Ruby binding to OpenLDAP Lightning MDB.'
+  s.description = 'lmdb is a Ruby binding to OpenLDAP Lightning MDB.'
   s.authors     = ['Daniel Mendler']
   s.extensions  = Dir['ext/**/extconf.rb']
 
