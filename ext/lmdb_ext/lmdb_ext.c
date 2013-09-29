@@ -88,7 +88,7 @@ static void transaction_finish(VALUE self, int commit) {
 #ifndef HAVE_RB_FUNCALL_PASSING_BLOCK
 static VALUE call_with_transaction_helper2(VALUE arg) {
         HelperArgs* a = (HelperArgs*)arg;
-        return rb_funcall_passing_block(a->self, rb_intern(a->name), a->argc, a->argv);
+        return rb_funcall2(a->self, rb_intern(a->name), a->argc, a->argv);
 }
 
 static VALUE call_with_transaction_helper(VALUE arg) {
