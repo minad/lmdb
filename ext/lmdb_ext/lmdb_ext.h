@@ -42,8 +42,6 @@
         Data_Get_Struct(var, Cursor, var_cur);  \
         cursor_check(var_cur)
 
-typedef struct Transaction Transaction;
-
 typedef struct Transaction {
         VALUE    env;
         VALUE    parent;
