@@ -14,6 +14,8 @@ gem install lmdb
 ### API
 
 ~~~ ruby
+require 'lmdb'
+
 env = LMDB.new(path)
 
 maindb = env.database
