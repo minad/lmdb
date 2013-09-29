@@ -4,6 +4,26 @@
 #include "ruby.h"
 #include "lmdb.h"
 
+// Ruby 1.8 compatibility
+#ifndef SIZET2NUM
+#  if SIZEOF_SIZE_T > SIZEOF_LONG && defined(HAVE_LONG_LONG)
+#   define SIZET2NUM(v) ULL2NUM(v)
+#  elif SIZEOF_SIZE_T == SIZEOF_LONG
+#   define SIZET2NUM(v) ULONG2NUM(v)
+#  else
+#   define SIZET2NUM(v) UINT2NUM(v)
+#  endif
+#endif
+
+// Ruby 1.8 compatibility
+#ifndef NUM2SSIZET
+#  if defined(HAVE_LONG_LONG) && SIZEOF_SIZE_T > SIZEOF_LONG
+#   define NUM2SSIZET(x) ((ssize_t)NUM2LL(x))
+#else
+#   define NUM2SSIZET(x) NUM2LONG(x)
+#  endif
+#endif
+
 #define ENVIRONMENT(var, var_env)                       \
         Environment* var_env;                           \
         Data_Get_Struct(var, Environment, var_env);     \

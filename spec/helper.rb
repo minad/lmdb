@@ -17,7 +17,7 @@ module LMDB::SpecHelper
   end
 
   def env
-    @env ||= LMDB::Environment.new path: path
+    @env ||= LMDB::Environment.new :path => path
   end
 end
 

@@ -2,13 +2,9 @@
 
 require 'bundler/setup'
 require 'rspec/core/rake_task'
-require "rake/extensiontask"
+require 'rake/extensiontask'
 
-# Install spec tasks
 RSpec::Core::RakeTask.new :spec
+Rake::ExtensionTask.new :lmdb_ext
 
-# Install compile task
-Rake::ExtensionTask.new('lmdb_ext')
-
-desc 'Default: compile & run specs.'
-task default: [:compile, :spec]
+task :default => [:compile, :spec]

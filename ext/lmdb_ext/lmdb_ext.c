@@ -84,10 +84,22 @@ static void transaction_finish(VALUE self, int commit) {
         check(ret);
 }
 
+// Ruby 1.8.7 compatibility
+#ifndef HAVE_RB_FUNCALL_PASSING_BLOCK
+static VALUE call_with_transaction_helper2(VALUE arg) {
+        HelperArgs* a = (HelperArgs*)arg;
+        return rb_funcall_passing_block(a->self, rb_intern(a->name), a->argc, a->argv);
+}
+
+static VALUE call_with_transaction_helper(VALUE arg) {
+        return rb_block_pass(call_with_transaction_helper2, arg, rb_block_proc());
+}
+#else
 static VALUE call_with_transaction_helper(VALUE arg) {
         HelperArgs* a = (HelperArgs*)arg;
         return rb_funcall_passing_block(a->self, rb_intern(a->name), a->argc, a->argv);
 }
+#endif
 
 static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags) {
         HelperArgs arg = { self, name, argc, argv };
