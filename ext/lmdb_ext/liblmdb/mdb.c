@@ -5231,9 +5231,10 @@ mdb_cursor_set(MDB_cursor *mc, MDB_val *key, MDB_val *data,
 		if (!mc->mc_top) {
 			/* There are no other pages */
 			mc->mc_ki[mc->mc_top] = 0;
-			if (op == MDB_SET_RANGE)
+			if (op == MDB_SET_RANGE) {
+				rc = 0;
 				goto set1;
-			else 
+			} else
 				return MDB_NOTFOUND;
 		}
 	}
@@ -5298,6 +5299,7 @@ set1:
 			if (rc) {
 				if (op == MDB_GET_BOTH || rc > 0)
 					return MDB_NOTFOUND;
+				rc = 0;
 			}
 
 		} else {
@@ -7248,8 +7250,11 @@ mdb_rebalance(MDB_cursor *mc)
 	else {
 		if (mc->mc_ki[ptop] == 0)
 			rc = mdb_page_merge(&mn, mc);
-		else
+		else {
+			mn.mc_ki[mn.mc_top] += mc->mc_ki[mn.mc_top] + 1;
 			rc = mdb_page_merge(mc, &mn);
+			mdb_cursor_copy(&mn, mc);
+		}
 		mc->mc_flags &= ~(C_INITIALIZED|C_EOF);
 	}
 	return rc;
