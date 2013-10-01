@@ -31,7 +31,9 @@ end
 env.close
 ~~~
 
-For details take a look at the specs.
+For details take a look at the specs. If you want to have a simpler interface
+to LMDB databases please consider using [Moneta](https://github.com/minad/moneta).
+The Moneta gem provides an LMDB adapter which uses this gem.
 
 ### Licence (MIT)
 
