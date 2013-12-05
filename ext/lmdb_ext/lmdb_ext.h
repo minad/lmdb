@@ -100,6 +100,7 @@ static VALUE cursor_close(VALUE self);
 static VALUE cursor_count(VALUE self);
 static VALUE cursor_delete(int argc, VALUE *argv, VALUE self);
 static VALUE cursor_first(VALUE self);
+static VALUE cursor_last(VALUE self);
 static void cursor_free(Cursor* cursor);
 static VALUE cursor_get(VALUE self);
 static void cursor_mark(Cursor* cursor);
