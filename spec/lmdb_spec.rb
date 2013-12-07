@@ -251,9 +251,15 @@ describe LMDB do
       db.put('key2', 'value2')
     end
 
-    it 'should get next key/value' do
+    it 'should get first key/value' do
       db.cursor do |c|
         c.first.should == ['key1', 'value1']
+      end
+    end
+
+    it 'should get last key/value' do
+      db.cursor do |c|
+        c.last.should == ['key2', 'value2']
       end
     end
 
