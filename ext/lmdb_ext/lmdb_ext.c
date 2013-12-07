@@ -583,6 +583,14 @@ static VALUE cursor_first(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+static VALUE cursor_last(VALUE self) {
+        CURSOR(self, cursor);
+        MDB_val key, value;
+
+        check(mdb_cursor_get(cursor->cur, &key, &value, MDB_LAST));
+        return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+}
+
 static VALUE cursor_prev(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -747,6 +755,7 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "close", cursor_close, 0);
         rb_define_method(cCursor, "get", cursor_get, 0);
         rb_define_method(cCursor, "first", cursor_first, 0);
+        rb_define_method(cCursor, "last", cursor_last, 0);
         rb_define_method(cCursor, "next", cursor_next, 0);
         rb_define_method(cCursor, "prev", cursor_prev, 0);
         rb_define_method(cCursor, "set", cursor_set, 1);
