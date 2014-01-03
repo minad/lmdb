@@ -42,6 +42,12 @@
         Data_Get_Struct(var, Cursor, var_cur);  \
         cursor_check(var_cur)
 
+/*
+ * We need the refcounting hack because the ruby gc frees the unreferenced/unmarked objects
+ * after the marking phase in arbitrary order. However the lmdb objects have to be released
+ * in the right order.
+ */
+
 typedef struct Transaction {
         VALUE    env;
         VALUE    parent;
