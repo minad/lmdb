@@ -42,31 +42,22 @@
         Data_Get_Struct(var, Cursor, var_cur);  \
         cursor_check(var_cur)
 
-/*
- * We need the refcounting hack because the ruby gc frees the unreferenced/unmarked objects
- * after the marking phase in arbitrary order. However the lmdb objects have to be released
- * in the right order.
- */
-
-typedef struct Transaction {
+typedef struct {
         VALUE    env;
         VALUE    parent;
         VALUE    thread;
         MDB_txn* txn;
-        int      refcount;
 } Transaction;
 
 typedef struct {
         MDB_env* env;
         VALUE    thread_txn_hash;
         VALUE    txn_thread_hash;
-        int      refcount;
 } Environment;
 
 typedef struct {
         VALUE   env;
         MDB_dbi dbi;
-        int     refcount;
 } Database;
 
 typedef struct {
@@ -106,9 +97,9 @@ static VALUE cursor_close(VALUE self);
 static VALUE cursor_count(VALUE self);
 static VALUE cursor_delete(int argc, VALUE *argv, VALUE self);
 static VALUE cursor_first(VALUE self);
-static VALUE cursor_last(VALUE self);
 static void cursor_free(Cursor* cursor);
 static VALUE cursor_get(VALUE self);
+static VALUE cursor_last(VALUE self);
 static void cursor_mark(Cursor* cursor);
 static VALUE cursor_next(VALUE self);
 static VALUE cursor_prev(VALUE self);
@@ -118,7 +109,6 @@ static VALUE cursor_set_range(VALUE self, VALUE vkey);
 static VALUE database_clear(VALUE self);
 static VALUE database_cursor(VALUE self);
 static VALUE database_delete(int argc, VALUE *argv, VALUE self);
-static void database_deref(Database* database);
 static VALUE database_drop(VALUE self);
 static VALUE database_get(VALUE self, VALUE vkey);
 static void database_mark(Database* database);
@@ -131,8 +121,8 @@ static VALUE environment_clear_flags(int argc, VALUE* argv, VALUE self);
 static VALUE environment_close(VALUE self);
 static VALUE environment_copy(VALUE self, VALUE path);
 static VALUE environment_database(int argc, VALUE *argv, VALUE self);
-static void environment_deref(Environment *environment);
 static VALUE environment_flags(VALUE self);
+static void environment_free(Environment *environment);
 static VALUE environment_info(VALUE self);
 static void environment_mark(Environment* environment);
 static VALUE environment_new(int argc, VALUE *argv, VALUE klass);
@@ -147,8 +137,8 @@ static MDB_txn* need_txn(VALUE self);
 static VALUE stat2hash(const MDB_stat* stat);
 static VALUE transaction_abort(VALUE self);
 static VALUE transaction_commit(VALUE self);
-static void transaction_deref(Transaction* transaction);
 static void transaction_finish(VALUE self, int commit);
+static void transaction_free(Transaction* transaction);
 static void transaction_mark(Transaction* transaction);
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags);
 // END PROTOTYPES

@@ -16,20 +16,12 @@ static void check(int code) {
         rb_raise(cError, "%s", err); /* fallback */
 }
 
-static void transaction_deref(Transaction* transaction) {
-        if (--transaction->refcount == 0) {
-                Environment* env = (Environment*)DATA_PTR(transaction->env);
-                environment_deref(env);
-                if (!NIL_P(transaction->parent)) {
-                        Transaction* parent = (Transaction*)DATA_PTR(transaction->parent);
-                        transaction_deref(parent);
-                }
-                if (transaction->txn) {
-                        rb_warn("Garbage collecting active transaction!");
-                        mdb_txn_abort(transaction->txn);
-                }
-                free(transaction);
+static void transaction_free(Transaction* transaction) {
+        if (transaction->txn) {
+                rb_warn("Memory leak - Garbage collecting active transaction");
+                //mdb_txn_abort(transaction->txn);
         }
+        free(transaction);
 }
 
 static void transaction_mark(Transaction* transaction) {
@@ -71,6 +63,7 @@ static void transaction_finish(VALUE self, int commit) {
         else
                 mdb_txn_abort(transaction->txn);
 
+        // Mark child transactions as closed
         p = environment_active_txn(transaction->env);
         while (p != self) {
                 TRANSACTION(p, txn);
@@ -108,20 +101,12 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         check(mdb_txn_begin(environment->env, active_txn(venv), flags, &txn));
 
         Transaction* transaction;
-        VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_deref, transaction);
-        transaction->refcount = 1;
+        VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_free, transaction);
         transaction->parent = environment_active_txn(venv);
         transaction->env = venv;
         transaction->txn = txn;
         transaction->thread = rb_thread_current();
         environment_set_active_txn(venv, transaction->thread, vtxn);
-
-        if (!NIL_P(transaction->parent)) {
-                TRANSACTION(transaction->parent, parent);
-                ++parent->refcount;
-        }
-
-        ++environment->refcount;
 
         int exception;
         VALUE ret = rb_protect(fn, NIL_P(arg) ? vtxn : arg, &exception);
@@ -141,12 +126,12 @@ static void environment_check(Environment* environment) {
                 rb_raise(cError, "Environment is closed");
 }
 
-static void environment_deref(Environment *environment) {
-        if (--environment->refcount == 0) {
-                if (environment->env)
-                        mdb_env_close(environment->env);
-                free(environment);
+static void environment_free(Environment *environment) {
+        if (environment->env) {
+                rb_warn("Memory leak - Garbage collecting open environment");
+                //mdb_env_close(environment->env);
         }
+        free(environment);
 }
 
 
@@ -262,9 +247,8 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         check(mdb_env_create(&env));
 
         Environment* environment;
-        VALUE venv = Data_Make_Struct(cEnvironment, Environment, environment_mark, environment_deref, environment);
+        VALUE venv = Data_Make_Struct(cEnvironment, Environment, environment_mark, environment_free, environment);
         environment->env = env;
-        environment->refcount = 1;
         environment->thread_txn_hash = rb_hash_new();
         environment->txn_thread_hash = rb_hash_new();
 
@@ -379,14 +363,6 @@ static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
         return with_transaction(self, rb_yield, Qnil, flags);
 }
 
-static void database_deref(Database* database) {
-        if (--database->refcount == 0) {
-                Environment* env = (Environment*)DATA_PTR(database->env);
-                environment_deref(env);
-                free(database);
-        }
-}
-
 static void database_mark(Database* database) {
         rb_gc_mark(database->env);
 }
@@ -413,11 +389,9 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         check(mdb_dbi_open(need_txn(self), NIL_P(name) ? 0 : StringValueCStr(name), flags, &dbi));
 
         Database* database;
-        VALUE vdb = Data_Make_Struct(cDatabase, Database, database_mark, database_deref, database);
+        VALUE vdb = Data_Make_Struct(cDatabase, Database, database_mark, free, database);
         database->dbi = dbi;
         database->env = self;
-        database->refcount = 1;
-        ++environment->refcount;
 
         return vdb;
 }
@@ -524,10 +498,11 @@ static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
 }
 
 static void cursor_free(Cursor* cursor) {
-        if (cursor->cur)
-                mdb_cursor_close(cursor->cur);
+        if (cursor->cur) {
+                rb_warn("Memory leak - Garbage collecting open cursor");
+                //mdb_cursor_close(cursor->cur);
+        }
 
-        database_deref((Database*)DATA_PTR(cursor->db));
         free(cursor);
 }
 
@@ -559,7 +534,6 @@ static VALUE database_cursor(VALUE self) {
         VALUE vcur = Data_Make_Struct(cCursor, Cursor, cursor_mark, cursor_free, cursor);
         cursor->cur = cur;
         cursor->db = self;
-        ++database->refcount;
 
         if (rb_block_given_p()) {
                 int exception;
@@ -746,7 +720,7 @@ void Init_lmdb_ext() {
         rb_define_method(cDatabase, "cursor", database_cursor, 0);
 
         cTransaction = rb_define_class_under(mLMDB, "Transaction", rb_cObject);
-        rb_undef_method(rb_singleton_class(cCursor), "new");
+        rb_undef_method(rb_singleton_class(cTransaction), "new");
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
 
