@@ -29,11 +29,17 @@ static void transaction_mark(Transaction* transaction) {
         rb_gc_mark(transaction->env);
 }
 
+/**
+ * Commit a transaction in process.
+ */
 static VALUE transaction_commit(VALUE self) {
         transaction_finish(self, 1);
         return Qnil;
 }
 
+/**
+ * Abort a transaction in process.
+ */
 static VALUE transaction_abort(VALUE self) {
         transaction_finish(self, 0);
         return Qnil;
@@ -140,6 +146,15 @@ static void environment_mark(Environment* environment) {
         rb_gc_mark(environment->txn_thread_hash);
 }
 
+/**
+ * @overload close
+ *   Close an environment, completing all IOs and cleaning up database
+ *   state if needed.
+ *   @example
+ *      env = Environment.new('abc')
+ *      # ...various operations on the environment...
+ *      env.close
+ */
 static VALUE environment_close(VALUE self) {
         ENVIRONMENT(self, environment);
         mdb_env_close(environment->env);
@@ -162,6 +177,17 @@ static VALUE stat2hash(const MDB_stat* stat) {
         return ret;
 }
 
+/**
+ * @overload stat
+ *   Return useful statistics about an environment.
+ *   @return [Hash] the statistics
+ *   * +:psize+ Size of a database page
+ *   * +:depth+ Depth (height) of the B-tree
+ *   * +:branch_pages+ Number of internal (non-leaf) pages
+ *   * +:leaf_pages+ Number of leaf pages
+ *   * +:overflow_pages+ Number of overflow pages
+ *   * +:entries+ Number of data items
+ */
 static VALUE environment_stat(VALUE self) {
         ENVIRONMENT(self, environment);
         MDB_stat stat;
@@ -169,6 +195,17 @@ static VALUE environment_stat(VALUE self) {
         return stat2hash(&stat);
 }
 
+/**
+ * @overload info
+ *   Return useful information about an environment.
+ *   @return [Hash]
+ *   * +:mapaddr+ The memory address at which the database is mapped, if fixed
+ *   * +:mapsize+ The size of the data memory map
+ *   * +:last_pgno+ ID of the last used page
+ *   * +:last_txnid+ ID of the last committed transaction
+ *   * +:maxreaders+ Max reader slots in the environment
+ *   * +:numreaders+ Max readers slots in the environment
+ */
 static VALUE environment_info(VALUE self) {
         MDB_envinfo info;
 
@@ -189,12 +226,37 @@ static VALUE environment_info(VALUE self) {
         return ret;
 }
 
+/**
+ * @overload copy(path)
+ *   Create a copy (snapshot) of an environment.  The copy can be used 
+ *   as a backup.  The copy internally uses a read-only transaction to 
+ *   ensure that the copied data is serialized with respect to database
+ *   updates.
+ *   @param [String] path The directory in which the copy will
+ *       reside. This directory must already exist and be writable but
+ *       must otherwise be empty.
+ *   @return nil
+ *   @raise [Error] when there is an error creating the copy.
+ */
 static VALUE environment_copy(VALUE self, VALUE path) {
         ENVIRONMENT(self, environment);
         check(mdb_env_copy(environment->env, StringValueCStr(path)));
         return Qnil;
 }
 
+/**
+ * @overload sync(force)
+ *   Flush the data buffers to disk.
+ *
+ *   Data is always written to disk when {Transaction#commit} is called, but
+ *   the operating system may keep it buffered. MDB always flushes the
+ *   OS buffers upon commit as well, unless the environment was opened
+ *   with +:nosync+ or in part +:nometasync+.
+ *   @param [Boolean] force If true, force a synchronous
+ *     flush. Otherwise if the environment has the +:nosync+ flag set
+ *     the flushes will be omitted, and with +:mapasync+ they will be
+ *     asynchronous.
+ */
 static VALUE environment_sync(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
 
@@ -229,6 +291,34 @@ static int environment_options(VALUE key, VALUE value, EnvironmentOptions* optio
         return 0;
 }
 
+/**
+ * @overload new(path, opts)
+ *   Open an LMDB database environment.  
+ *   The database environment is the root object for all operations on
+ *   a collection of databases.  It has to be opened first, before 
+ *   individual databases can be opened or created in the environment.
+ *   The database should be closed when it is no longer needed.
+ *
+ *   The options has on this method includes all the flags listed in
+ *   {Environment#flags} as well as the options documented here.
+ *   @return [Environment]
+ *   @param [String] path the path to the files containing the database
+ *   @param [Hash] opts options for the database environment
+ *   @option opts [Number] :mode The Posix permissions to set on created files.
+ *   @option opts [Number] :maxreaders The maximum number of concurrent threads
+ *       that can be executing transactions at once.  Default is 126.
+ *   @option opts [Number] :maxdbs The maximum number of named databases in the
+ *       environment.  Not needed if only one database is being used.
+ *   @option opts [Number] :mapsize The size of the memory map to be allocated
+ *       for this environment, in bytes.  The memory map size is the
+ *       maximum total size of the database.  The size should be a
+ *       multiple of the OS page size.  The default size is about
+ *       10MiB.
+ *   @see #close
+ *   @see Environment#flags
+ *   @example
+ *      env = Environment.new "dbdir", :maxdbs => 30, :mapasync => true, :writemap => true
+ */
 static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         VALUE path, option_hash;
         rb_scan_args(argc, argv, "1:", &path, &option_hash);
@@ -266,6 +356,23 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         return venv;
 }
 
+/**
+ * @overload flags
+ *   Return the flags that are set in this environment.
+ *   @return [Array] Array of flag symbols
+ *   The environment flags are:
+ *   * +:fixedmap+ Use a fixed address for the mmap region. 
+ *   * +:nosubdir+ By default, MDB creates its environment in a directory whose pathname is given in +path+, and creates its data and lock files under that directory. With this option, path is used as-is for the database main data file. The database lock file is the path with "-lock" appended.
+ *   * +:nosync+ Don't flush system buffers to disk when committing a transaction. This optimization means a system crash can corrupt the database or lose the last transactions if buffers are not yet flushed to disk. The risk is governed by how often the system flushes dirty buffers to disk and how often {Environment#sync} is called. However, if the filesystem preserves write order and the +:writemap+ flag is not used, transactions exhibit ACI (atomicity, consistency, isolation) properties and only lose D (durability). That is, database integrity is maintained, but a system crash may undo the final transactions. Note that +:nosync + :writemap+ leaves the system with no hint for when to write transactions to disk, unless {Environment#sync} is called. +:mapasync + :writemap+ may be preferable.
+ *   * +:rdonly+ Open the environment in read-only mode. No write operations will be allowed. MDB will still modify the lock file - except on read-only filesystems, where MDB does not use locks.
+ *   * +:nometasync+ Flush system buffers to disk only once per transaction, omit the metadata flush. Defer that until the system flushes files to disk, or next  non-MDB_RDONLY commit or {Environment#sync}. This optimization maintains database integrity, but a system crash may undo the last committed transaction. That is, it preserves the ACI (atomicity, consistency, isolation) but not D (durability) database property.
+ *   * +:writemap+ Use a writeable memory map unless +:rdonly+ is set. This is faster and uses fewer mallocs, but loses protection from application bugs like wild pointer writes and other bad updates into the database. Incompatible with nested transactions.
+ *   * +:mapasync+ When using +:writemap+, use asynchronous flushes to disk. As with +:nosync+, a system crash can then corrupt the database or lose the last transactions. Calling {Environment#sync} ensures on-disk database integrity until next commit.
+ *   * +:notls+ Don't use thread-local storage.
+ *   @example
+ *       env = Environment.new "abc", :writemap => true, :nometasync => true
+ *       env.flags           #=> [:writemap, :nometasync]
+ */
 static VALUE environment_flags(VALUE self) {
         unsigned int flags;
         ENVIRONMENT(self, environment);
@@ -279,6 +386,11 @@ static VALUE environment_flags(VALUE self) {
         return ret;
 }
 
+/**
+ * @overload path
+ *   Return the path to the database environment files
+ *   @return [String] the path that was used to open the environment.
+ */
 static VALUE environment_path(VALUE self) {
         const char* path;
         ENVIRONMENT(self, environment);
@@ -303,16 +415,47 @@ static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set
         return Qnil;
 }
 
+/**
+ * @overload set_flags(flags)
+ *   Set one or more flags in the environment.  The available flags are defined in Environment.new. 
+ *   @see Environment.new
+ *   @see Environment#flags
+ *   @param [Array] flags Array of flag names (symbols) to set
+ *   @return nil
+ *   @raise [Error] if an invalid flag name is specified
+ *   @example
+ *    env.set_flags :nosync, :writemap
+ */
 static VALUE environment_set_flags(int argc, VALUE* argv, VALUE self) {
         environment_change_flags(argc, argv, self, 1);
         return Qnil;
 }
 
+/**
+ * @overload clear_flags(flags)
+ *   Clear one or more flags in the environment.  The available flags are defined in Environment.new. 
+ *   @see Environment.new
+ *   @see Environment#flags
+ *   @param [Array] flags Array of flag names (symbols) to clear
+ *   @return nil
+ *   @raise [Error] if an invalid flag name is specified
+ *   @example
+ *     env.clear_flags :nosync, :writemap
+ */
 static VALUE environment_clear_flags(int argc, VALUE* argv, VALUE self) {
         environment_change_flags(argc, argv, self, 0);
         return Qnil;
 }
 
+/**
+ * @overload active_txn
+ *   @return [Transaction] the current active transaction on this thread in the environment.
+ *   @example
+ *      env.transaction do |t|
+ *        active = env.active_txn
+ *        # active should equal t
+ *      end
+ */
 static VALUE environment_active_txn(VALUE self) {
         ENVIRONMENT(self, environment);
         return rb_hash_aref(environment->thread_txn_hash, rb_thread_current());
@@ -353,6 +496,34 @@ static MDB_txn* need_txn(VALUE self) {
         return txn;
 }
 
+/**
+ * @overload transaction(readonly)
+ *   Begin a transaction.  Takes a block to run the body of the
+ *   transaction.  A transaction commits when it exits the block successfully.
+ *   A transaction aborts when it raises an exception or calls
+ *   {Transaction#abort}.
+ *   @param [Boolean] readonly This transaction will not perform any
+ *      write operations
+ *   @note Transactions can be nested.
+ *   @yield [txn] The block to be executed with the body of the transaction.
+ *   @yieldparam txn [Transaction] An optional transaction argument
+ *   @example
+ *      db = env.database "mydata"
+ *      env.transaction do |txn1|
+ *        db['a'] = 1
+ *        env.transaction do |txn2|
+ *          # txn2 is nested in txn1
+ *          db['a'] = 2
+ *          db['a']                    #=> 2
+ *          txn2.abort
+ *        end
+ *        db['a']                      #=> 1
+ *        env.transaction do
+ *          db['a'] = 3
+ *        end
+ *      end
+ *      db['a']                        #=> 3
+ */
 static VALUE environment_transaction(int argc, VALUE *argv, VALUE self) {
         rb_need_block();
 
@@ -373,6 +544,44 @@ static void database_mark(Database* database) {
 #undef METHOD
 #undef FILE
 
+/**
+ * @overload database(name, options)
+ *   Opens a database within the environment.
+ *
+ *   Note that a database is opened or created within a transaction.  If
+ *   the open creates a new database, the database is not available for
+ *   other operations in other transactions until the transaction that
+ *   is creating the database commits.  If the transaction creating the
+ *   database aborts, the database is not created.
+ *   @return [Database] newly-opened database
+ *   @raise [Error] if there is an error opening the database
+ *   @param [String] name Optional name for the database to be opened.
+ *   @param [Hash] options Options for the database.
+ *   @option options [Boolean] :reversekey Keys are strings to be
+ *       compared in reverse order, from the end of the strings to the
+ *       beginning. By default, Keys are treated as strings and
+ *       compared from beginning to end.
+ *   @option options [Boolean] :dupsort Duplicate keys may be used in
+ *       the database. (Or, from another perspective, keys may have
+ *       multiple data items, stored in sorted order.) By default keys
+ *       must be unique and may have only a single data item.
+ *   @option options [Boolean] :integerkey Keys are binary integers in
+ *       native byte order.
+ *   @option options [Boolean] :dupfixed This flag may only be used in
+ *       combination with +:dupsort+. This option tells the library
+ *       that the data items for this database are all the same size,
+ *       which allows further optimizations in storage and retrieval.
+ *   @option options [Boolean] :integerdup This option specifies that
+ *       duplicate data items are also integers, and should be sorted
+ *       as such.
+ *   @option options [Boolean] :reversedup This option specifies that
+ *       duplicate data items should be compared as strings in reverse
+ *       order.
+ *   @option options [Boolean] :create Create the named database if it
+ *       doesn't exist. This option is not allowed in a read-only
+ *       transaction or a read-only environment.
+
+ */
 static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
         if (!active_txn(self))
@@ -414,6 +623,12 @@ static VALUE database_drop(VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload clear
+ *    Empty out the database
+ *    @return nil
+ *    @note The clear happens transactionally.
+ */
 static VALUE database_clear(VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
