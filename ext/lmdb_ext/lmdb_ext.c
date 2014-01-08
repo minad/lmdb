@@ -192,7 +192,7 @@ static void environment_mark(Environment* environment) {
  *   Close an environment, completing all IOs and cleaning up database
  *   state if needed.
  *   @example
- *      env = Environment.new('abc')
+ *      env = LMDB.new('abc')
  *      # ...various operations on the environment...
  *      env.close
  */
@@ -340,7 +340,7 @@ static int environment_options(VALUE key, VALUE value, EnvironmentOptions* optio
  *   individual databases can be opened or created in the environment.
  *   The database should be closed when it is no longer needed.
  *
- *   The options has on this method includes all the flags listed in
+ *   The options hash on this method includes all the flags listed in
  *   {Environment#flags} as well as the options documented here.
  *   @return [Environment]
  *   @param [String] path the path to the files containing the database
@@ -355,10 +355,16 @@ static int environment_options(VALUE key, VALUE value, EnvironmentOptions* optio
  *       maximum total size of the database.  The size should be a
  *       multiple of the OS page size.  The default size is about
  *       10MiB.
+ *   @yield [env] The block to be executed with the environment. The environment is closed afterwards.
+ *   @yieldparam env [Environment] The environment
  *   @see #close
  *   @see Environment#flags
- *   @example
- *      env = Environment.new "dbdir", :maxdbs => 30, :mapasync => true, :writemap => true
+ *   @example Open environment and pass options
+ *      env = LMDB.new "dbdir", :maxdbs => 30, :mapasync => true, :writemap => true
+ *   @example Pass environment to block
+ *      LMDB.new "dbdir" do |env|
+ *        # ...
+ *      end
  */
 static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         VALUE path, option_hash;
@@ -411,7 +417,7 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
  *   * +:mapasync+ When using +:writemap+, use asynchronous flushes to disk. As with +:nosync+, a system crash can then corrupt the database or lose the last transactions. Calling {Environment#sync} ensures on-disk database integrity until next commit.
  *   * +:notls+ Don't use thread-local storage.
  *   @example
- *       env = Environment.new "abc", :writemap => true, :nometasync => true
+ *       env = LMDB.new "abc", :writemap => true, :nometasync => true
  *       env.flags           #=> [:writemap, :nometasync]
  */
 static VALUE environment_flags(VALUE self) {
@@ -458,8 +464,7 @@ static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set
 
 /**
  * @overload set_flags(flags)
- *   Set one or more flags in the environment.  The available flags are defined in Environment.new.
- *   @see Environment.new
+ *   Set one or more flags in the environment. The available flags are defined in {Environment#flags}.
  *   @see Environment#flags
  *   @param [Array] flags Array of flag names (symbols) to set
  *   @return nil
@@ -474,8 +479,7 @@ static VALUE environment_set_flags(int argc, VALUE* argv, VALUE self) {
 
 /**
  * @overload clear_flags(flags)
- *   Clear one or more flags in the environment.  The available flags are defined in Environment.new.
- *   @see Environment.new
+ *   Clear one or more flags in the environment. The available flags are defined in {Environment#flags}.
  *   @see Environment#flags
  *   @param [Array] flags Array of flag names (symbols) to clear
  *   @return nil
@@ -1157,7 +1161,7 @@ void Init_lmdb_ext() {
          * the database name to open the database within the environment.
          *
          * @example The normal pattern for using LMDB in Ruby
-         *    env = Environment.new "databasedir"
+         *    env = LMDB.new "databasedir"
          *    db = env.database "databasename"
          *    # ... do things to the database ...
          *    env.close
@@ -1195,7 +1199,7 @@ void Init_lmdb_ext() {
          * database using a {Cursor}.
          *
          * @example Typical usage
-         *    env = Environment.new "databasedir"
+         *    env = LMDB.new "databasedir"
          *    db = env.database "databasename"
          *    db.put "key1", "value1"
          *    db.put "key2", "value2"
@@ -1239,7 +1243,7 @@ void Init_lmdb_ext() {
          * a block for the code to execute in that transaction.
          *
          * @example Typical usage
-         *    env = Environment.new "databasedir"
+         *    env = LMDB.new "databasedir"
          *    db1 = env.database "database1"
          *    env.transaction do |parent|
          *      db2 = env.database "database2", :create => true
@@ -1290,7 +1294,7 @@ void Init_lmdb_ext() {
          * that should be performed using the cursor.
          *
          * @example Typical usage
-         *    env = Environment.new "databasedir"
+         *    env = LMDB.new "databasedir"
          *    db = env.database "databasename"
          *    db.cursor do |cursor|
          *      rl = cursor.last           #=> content of the last record
