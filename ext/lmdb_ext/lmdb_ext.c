@@ -30,7 +30,29 @@ static void transaction_mark(Transaction* transaction) {
 }
 
 /**
- * Commit a transaction in process.
+ * Commit a transaction in process.  Any subtransactions of this
+ * transaction will be committed as well.
+ *
+ * One does not normally need to call commit explicitly; a
+ * commit is performed automatically when the block supplied to
+ * {Environment#transaction} exits normally.
+ *
+ * @note After committing a transaction, no further database operations
+ *    should be done in the block.  Any cursors created in the context  
+ *    of the transaction will no longer be valid.
+ *
+ * @example Single transaction
+ *    env.transaction do |txn|
+ *      # ... modify the databases ...
+ *      txn.commit
+ *    end
+ *
+ * @example Child transactions
+ *    env.transaction do |txn1|
+ *      env.transaction.do |txn2|
+ *         txn1.commit      # txn1 and txn2 are both committed
+ *      end
+ *    end
  */
 static VALUE transaction_commit(VALUE self) {
         transaction_finish(self, 1);
@@ -38,7 +60,26 @@ static VALUE transaction_commit(VALUE self) {
 }
 
 /**
- * Abort a transaction in process.
+ * Abort a transaction in process. Any subtransactions of this
+ * transaction will be aborted as well.
+ *
+ * @note After aborting a transaction, no further database operations
+ *    should be done in the block.  Any cursors created in the context  
+ *    of the transaction will no longer be valid.
+ *
+ * @example Single transaction
+ *    env.transaction do |txn|
+ *      # ... modify the databases ...
+ *      txn.abort
+ *      # modifications are rolled back
+ *    end
+ *
+ * @example Child transactions
+ *    env.transaction do |txn1|
+ *      env.transaction.do |txn2|
+ *         txn1.abort      # txn1 and txn2 are both aborted
+ *      end
+ *    end
  */
 static VALUE transaction_abort(VALUE self) {
         transaction_finish(self, 0);
@@ -605,6 +646,17 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         return vdb;
 }
 
+/**
+ * @overload stat
+ *   Return useful statistics about a database.
+ *   @return [Hash] the statistics
+ *   * +:psize+ Size of a database page
+ *   * +:depth+ Depth (height) of the B-tree
+ *   * +:branch_pages+ Number of internal (non-leaf) pages
+ *   * +:leaf_pages+ Number of leaf pages
+ *   * +:overflow_pages+ Number of overflow pages
+ *   * +:entries+ Number of data items
+ */
 static VALUE database_stat(VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -615,6 +667,12 @@ static VALUE database_stat(VALUE self) {
         return stat2hash(&stat);
 }
 
+/**
+ * @overload drop
+ *   Remove a database from the environment.
+ *   @return nil
+ *   @note The drop happens transactionally.
+ */
 static VALUE database_drop(VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -637,6 +695,15 @@ static VALUE database_clear(VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload get(key)
+ *   Retrieves one value associated with this key.
+ *   This function retrieves key/data pairs from the database.  If the
+ *   database supports duplicate keys (+:dupsort+) then the first data
+ *   item for the key will be returned. Retrieval of other items
+ *   requires the use of {#cursor}.
+ *   @param key The key of the record to retrieve.
+ */
 static VALUE database_get(VALUE self, VALUE vkey) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -660,6 +727,33 @@ static VALUE database_get(VALUE self, VALUE vkey) {
 #undef METHOD
 #undef FILE
 
+/**
+ * @overload put(key, value, options)
+ *   Stores items into a database.
+ *   This function stores key/value pairs in the database. The default
+ *   behavior is to enter the new key/value pair, replacing any
+ *   previously existing key if duplicates are disallowed, or adding a
+ *   duplicate data item if duplicates are allowed (+:dupsort+).
+ *   @param key The key of the record to set
+ *   @param value The value to insert for this key
+ *   @option options [Boolean] :nodupdata Enter the new key/value
+ *       pair only if it does not already appear in the database. This
+ *       flag may only be specified if the database was opened with
+ *       +:dupsort+. The function will raise an {Error} if the
+ *       key/data pair already appears in the database.
+ *   @option options [Boolean] :nooverwrite Enter the new key/value
+ *       pair only if the key does not already appear in the
+ *       database. The function will raise an {Error] if the key
+ *       already appears in the database, even if the database
+ *       supports duplicates (+:dupsort+). 
+ *   @option options [Boolean] :append Append the given key/data pair
+ *       to the end of the database. No key comparisons are
+ *       performed. This option allows fast bulk loading when keys are
+ *       already known to be in the correct order. Loading unsorted
+ *       keys with this flag will cause data corruption.
+ *   @option options [Boolean] :appenddup As above, but for sorted dup
+ *       data.
+ */
 static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -685,6 +779,21 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload delete(key, value=nil)
+ *
+ * Deletes records from the database.  This function removes
+ * key/data pairs from the database. If the database does not support
+ * sorted duplicate data items (+:dupsort+) the value parameter is
+ * ignored. If the database supports sorted duplicates and the value
+ * parameter is +nil+, all of the duplicate data items for the key will
+ * be deleted. Otherwise, if the data parameter is non-nil only the
+ * matching data item will be deleted. 
+ *
+ * @param key The key of the record to delete.
+ * @param value The optional value of the record to delete.
+ * @raise [Error] if the specified key/value pair is not in the database.
+ */
 static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -730,6 +839,10 @@ static void cursor_mark(Cursor* cursor) {
         rb_gc_mark(cursor->db);
 }
 
+/**
+ * @overload close
+ *  Close a cursor.  The cursor must not be used again after this call.
+ */
 static VALUE cursor_close(VALUE self) {
         CURSOR(self, cursor);
         mdb_cursor_close(cursor->cur);
@@ -737,6 +850,20 @@ static VALUE cursor_close(VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload cursor
+ *   Create a cursor to iterate through a database.
+ *
+ *   @see Cursor
+ *   @yield [cursor] A block to be executed with the cursor
+ *   @yieldparam cursor [Cursor] The cursor to be used to iterate 
+ *   @example 
+ *    db = env.database "abc"
+ *    db.cursor do |c|
+ *      key, value = c.next
+ *      puts "#{key}: #{value}"
+ *    end
+ */
 static VALUE database_cursor(VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
@@ -764,6 +891,13 @@ static VALUE database_cursor(VALUE self) {
         return vcur;
 }
 
+/**
+ * @overload first
+ *    Position the cursor to the first record in the database, and
+ *    return its value.
+ *    @return [Array,nil] The [key, value] pair for the first record, or 
+ *        nil if no record
+ */
 static VALUE cursor_first(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -772,6 +906,13 @@ static VALUE cursor_first(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+/**
+ * @overload last
+ *    Position the cursor to the last record in the database, and
+ *    return its value.
+ *    @return [Array,nil] The [key, value] pair for the last record, or 
+ *        nil if no record.
+ */
 static VALUE cursor_last(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -780,6 +921,13 @@ static VALUE cursor_last(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+/**
+ * @overload prev
+ *    Position the cursor to the previous record in the database, and
+ *    return its value.
+ *    @return [Array,nil] The [key, value] pair for the previous record, or
+ *        nil if no previous record.
+ */
 static VALUE cursor_prev(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -791,6 +939,13 @@ static VALUE cursor_prev(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+/**
+ * @overload next
+ *    Position the cursor to the next record in the database, and
+ *    return its value.
+ *    @return [Array,nil] The [key, value] pair for the next record, or
+ *        nil if no next record.
+ */
 static VALUE cursor_next(VALUE self) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -802,6 +957,12 @@ static VALUE cursor_next(VALUE self) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+/**
+ * @overload set(key)
+ *   Set the cursor to a specified key
+ *   @param key The key to which the cursor should be positioned
+ *   @return [Array] The [key, value] pair to which the cursor now points.
+ */
 static VALUE cursor_set(VALUE self, VALUE vkey) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -813,6 +974,12 @@ static VALUE cursor_set(VALUE self, VALUE vkey) {
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
 
+/**
+ * @overload set_range(key)
+ *   Set the cursor at the first key greater than or equal to a specified key.
+ *   @param key The key to which the cursor should be positioned
+ *   @return [Array] The [key, value] pair to which the cursor now points.
+ */
 static VALUE cursor_set_range(VALUE self, VALUE vkey) {
         CURSOR(self, cursor);
         MDB_val key, value;
@@ -823,6 +990,12 @@ static VALUE cursor_set_range(VALUE self, VALUE vkey) {
         check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET_RANGE));
         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
 }
+
+/**
+ * @overload get
+ *    Return the value of the record to which the cursor points.
+ *    @return [Array] The [key, value] pair for the current record.
+ */
 
 static VALUE cursor_get(VALUE self) {
         CURSOR(self, cursor);
@@ -841,6 +1014,37 @@ static VALUE cursor_get(VALUE self) {
 #undef METHOD
 #undef FILE
 
+/**
+ * @overload put(key, value, options)
+ *   Store by cursor.  This function stores key/data pairs into the
+ *   database. If the function fails for any reason, the state of
+ *   the cursor will be unchanged. If the function succeeds and an
+ *   item is inserted into the database, the cursor is always
+ *   positioned to refer to the newly inserted item.
+ *   @return nil
+ *   @param key The key of the record to set
+ *   @param value The value to insert for this key
+ *   @option options [Boolean] :current Overwrite the data of the
+ *       key/data pair to which the cursor refers with the specified
+ *       data item. The +key+ parameter is ignored.
+ *   @option options [Boolean] :nodupdata Enter the new key/value
+ *       pair only if it does not already appear in the database. This
+ *       flag may only be specified if the database was opened with
+ *       +:dupsort+. The function will raise an {Error} if the
+ *       key/data pair already appears in the database.
+ *   @option options [Boolean] :nooverwrite Enter the new key/value
+ *       pair only if the key does not already appear in the
+ *       database. The function will raise an {Error] if the key
+ *       already appears in the database, even if the database
+ *       supports duplicates (+:dupsort+). 
+ *   @option options [Boolean] :append Append the given key/data pair
+ *       to the end of the database. No key comparisons are
+ *       performed. This option allows fast bulk loading when keys are
+ *       already known to be in the correct order. Loading unsorted
+ *       keys with this flag will cause data corruption.
+ *   @option options [Boolean] :appenddup As above, but for sorted dup
+ *       data.
+ */
 static VALUE cursor_put(int argc, VALUE* argv, VALUE self) {
         CURSOR(self, cursor);
 
@@ -870,6 +1074,14 @@ static VALUE cursor_put(int argc, VALUE* argv, VALUE self) {
 #undef METHOD
 #undef FILE
 
+/** 
+ * @overload delete(options)
+ *    Delete current key/data pair.
+ *    This function deletes the key/data pair to which the cursor refers.
+  *    @option options [Boolean] :nodupdata Delete all of the data
+ *        items for the current key. This flag may only be specified
+ *        if the database was opened with +:dupsort+.
+ */
 static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
         CURSOR(self, cursor);
 
@@ -884,6 +1096,13 @@ static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload count 
+ *    Return count of duplicates for current key.  This call is only
+ *    valid on databases that support sorted duplicate data items
+ *    +:dupsort+.
+ *    @return [Number] count of duplicates
+ */
 static VALUE cursor_count(VALUE self) {
         CURSOR(self, cursor);
         size_t count;
