@@ -6,7 +6,7 @@
 Ruby bindings for the amazing OpenLDAP's Lightning Memory-Mapped Database (LMDB)
 http://symas.com/mdb/
 
-### Installation
+## Installation
 
 Install via rubygems:
 
@@ -14,7 +14,16 @@ Install via rubygems:
 gem install lmdb
 ```
 
-### API
+## Links
+
+* Source: <http://github.com/minad/lmdb>
+* Bugs:   <http://github.com/minad/lmdb/issues>
+* Tests and benchmarks: <http://travis-ci.org/minad/lmdb>
+* API documentation:
+    * Latest Gem: <http://rubydoc.info/gems/lmdb/frames>
+    * GitHub master: <http://rubydoc.info/github/minad/lmdb/master/frames>
+
+## API
 
 ```ruby
 require 'lmdb'
@@ -34,11 +43,9 @@ end
 env.close
 ```
 
-For details take a look at the specs. If you want to have a simpler interface
-to LMDB databases please consider using [Moneta](https://github.com/minad/moneta).
-The Moneta gem provides an LMDB adapter which uses this gem.
+If you want to have a simpler interface to LMDB databases please consider using [Moneta](https://github.com/minad/moneta). The Moneta gem provides an LMDB adapter which uses this gem.
 
-### Licence (MIT)
+## Licence (MIT)
 
 ```
 Copyright (c) 2013 Daniel Mendler
