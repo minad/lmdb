@@ -16,7 +16,7 @@ gem install lmdb
 
 ### API
 
-~~~ ruby
+```ruby
 require 'lmdb'
 
 env = LMDB.new(path)
@@ -32,7 +32,7 @@ env.transaction do
 end
 
 env.close
-~~~
+```
 
 For details take a look at the specs. If you want to have a simpler interface
 to LMDB databases please consider using [Moneta](https://github.com/minad/moneta).

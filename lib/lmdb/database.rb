@@ -20,7 +20,7 @@ module LMDB
 
     # Retrieve the value of a record from a database
     # @param key the record key to retrieve
-    # @return value of the record for that key, or nil if there is 
+    # @return value of the record for that key, or nil if there is
     #      no record with that key
     # @see #get(key)
     def [](key)

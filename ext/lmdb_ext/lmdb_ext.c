@@ -38,7 +38,7 @@ static void transaction_mark(Transaction* transaction) {
  * {Environment#transaction} exits normally.
  *
  * @note After committing a transaction, no further database operations
- *    should be done in the block.  Any cursors created in the context  
+ *    should be done in the block.  Any cursors created in the context
  *    of the transaction will no longer be valid.
  *
  * @example Single transaction
@@ -64,7 +64,7 @@ static VALUE transaction_commit(VALUE self) {
  * transaction will be aborted as well.
  *
  * @note After aborting a transaction, no further database operations
- *    should be done in the block.  Any cursors created in the context  
+ *    should be done in the block.  Any cursors created in the context
  *    of the transaction will no longer be valid.
  *
  * @example Single transaction
@@ -269,8 +269,8 @@ static VALUE environment_info(VALUE self) {
 
 /**
  * @overload copy(path)
- *   Create a copy (snapshot) of an environment.  The copy can be used 
- *   as a backup.  The copy internally uses a read-only transaction to 
+ *   Create a copy (snapshot) of an environment.  The copy can be used
+ *   as a backup.  The copy internally uses a read-only transaction to
  *   ensure that the copied data is serialized with respect to database
  *   updates.
  *   @param [String] path The directory in which the copy will
@@ -334,9 +334,9 @@ static int environment_options(VALUE key, VALUE value, EnvironmentOptions* optio
 
 /**
  * @overload new(path, opts)
- *   Open an LMDB database environment.  
+ *   Open an LMDB database environment.
  *   The database environment is the root object for all operations on
- *   a collection of databases.  It has to be opened first, before 
+ *   a collection of databases.  It has to be opened first, before
  *   individual databases can be opened or created in the environment.
  *   The database should be closed when it is no longer needed.
  *
@@ -402,7 +402,7 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
  *   Return the flags that are set in this environment.
  *   @return [Array] Array of flag symbols
  *   The environment flags are:
- *   * +:fixedmap+ Use a fixed address for the mmap region. 
+ *   * +:fixedmap+ Use a fixed address for the mmap region.
  *   * +:nosubdir+ By default, MDB creates its environment in a directory whose pathname is given in +path+, and creates its data and lock files under that directory. With this option, path is used as-is for the database main data file. The database lock file is the path with "-lock" appended.
  *   * +:nosync+ Don't flush system buffers to disk when committing a transaction. This optimization means a system crash can corrupt the database or lose the last transactions if buffers are not yet flushed to disk. The risk is governed by how often the system flushes dirty buffers to disk and how often {Environment#sync} is called. However, if the filesystem preserves write order and the +:writemap+ flag is not used, transactions exhibit ACI (atomicity, consistency, isolation) properties and only lose D (durability). That is, database integrity is maintained, but a system crash may undo the final transactions. Note that +:nosync + :writemap+ leaves the system with no hint for when to write transactions to disk, unless {Environment#sync} is called. +:mapasync + :writemap+ may be preferable.
  *   * +:rdonly+ Open the environment in read-only mode. No write operations will be allowed. MDB will still modify the lock file - except on read-only filesystems, where MDB does not use locks.
@@ -458,7 +458,7 @@ static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set
 
 /**
  * @overload set_flags(flags)
- *   Set one or more flags in the environment.  The available flags are defined in Environment.new. 
+ *   Set one or more flags in the environment.  The available flags are defined in Environment.new.
  *   @see Environment.new
  *   @see Environment#flags
  *   @param [Array] flags Array of flag names (symbols) to set
@@ -474,7 +474,7 @@ static VALUE environment_set_flags(int argc, VALUE* argv, VALUE self) {
 
 /**
  * @overload clear_flags(flags)
- *   Clear one or more flags in the environment.  The available flags are defined in Environment.new. 
+ *   Clear one or more flags in the environment.  The available flags are defined in Environment.new.
  *   @see Environment.new
  *   @see Environment#flags
  *   @param [Array] flags Array of flag names (symbols) to clear
@@ -621,7 +621,6 @@ static void database_mark(Database* database) {
  *   @option options [Boolean] :create Create the named database if it
  *       doesn't exist. This option is not allowed in a read-only
  *       transaction or a read-only environment.
-
  */
 static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
         ENVIRONMENT(self, environment);
@@ -745,7 +744,7 @@ static VALUE database_get(VALUE self, VALUE vkey) {
  *       pair only if the key does not already appear in the
  *       database. The function will raise an {Error] if the key
  *       already appears in the database, even if the database
- *       supports duplicates (+:dupsort+). 
+ *       supports duplicates (+:dupsort+).
  *   @option options [Boolean] :append Append the given key/data pair
  *       to the end of the database. No key comparisons are
  *       performed. This option allows fast bulk loading when keys are
@@ -788,7 +787,7 @@ static VALUE database_put(int argc, VALUE *argv, VALUE self) {
  * ignored. If the database supports sorted duplicates and the value
  * parameter is +nil+, all of the duplicate data items for the key will
  * be deleted. Otherwise, if the data parameter is non-nil only the
- * matching data item will be deleted. 
+ * matching data item will be deleted.
  *
  * @param key The key of the record to delete.
  * @param value The optional value of the record to delete.
@@ -856,8 +855,8 @@ static VALUE cursor_close(VALUE self) {
  *
  *   @see Cursor
  *   @yield [cursor] A block to be executed with the cursor
- *   @yieldparam cursor [Cursor] The cursor to be used to iterate 
- *   @example 
+ *   @yieldparam cursor [Cursor] The cursor to be used to iterate
+ *   @example
  *    db = env.database "abc"
  *    db.cursor do |c|
  *      key, value = c.next
@@ -895,7 +894,7 @@ static VALUE database_cursor(VALUE self) {
  * @overload first
  *    Position the cursor to the first record in the database, and
  *    return its value.
- *    @return [Array,nil] The [key, value] pair for the first record, or 
+ *    @return [Array,nil] The [key, value] pair for the first record, or
  *        nil if no record
  */
 static VALUE cursor_first(VALUE self) {
@@ -910,7 +909,7 @@ static VALUE cursor_first(VALUE self) {
  * @overload last
  *    Position the cursor to the last record in the database, and
  *    return its value.
- *    @return [Array,nil] The [key, value] pair for the last record, or 
+ *    @return [Array,nil] The [key, value] pair for the last record, or
  *        nil if no record.
  */
 static VALUE cursor_last(VALUE self) {
@@ -1036,7 +1035,7 @@ static VALUE cursor_get(VALUE self) {
  *       pair only if the key does not already appear in the
  *       database. The function will raise an {Error] if the key
  *       already appears in the database, even if the database
- *       supports duplicates (+:dupsort+). 
+ *       supports duplicates (+:dupsort+).
  *   @option options [Boolean] :append Append the given key/data pair
  *       to the end of the database. No key comparisons are
  *       performed. This option allows fast bulk loading when keys are
@@ -1074,7 +1073,7 @@ static VALUE cursor_put(int argc, VALUE* argv, VALUE self) {
 #undef METHOD
 #undef FILE
 
-/** 
+/**
  * @overload delete(options)
  *    Delete current key/data pair.
  *    This function deletes the key/data pair to which the cursor refers.
@@ -1097,7 +1096,7 @@ static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
 }
 
 /**
- * @overload count 
+ * @overload count
  *    Return count of duplicates for current key.  This call is only
  *    valid on databases that support sorted duplicate data items
  *    +:dupsort+.
@@ -1113,6 +1112,12 @@ static VALUE cursor_count(VALUE self) {
 void Init_lmdb_ext() {
         VALUE mLMDB;
 
+        /**
+         * Document-module: LMDB
+         *
+         * The LMDB module presents a Ruby API to the OpenLDAP Lightning Memory-mapped Database (LMDB).
+         * @see http://symas.com/mdb/
+         */
         mLMDB = rb_define_module("LMDB");
         rb_define_const(mLMDB, "LIB_VERSION", rb_str_new2(MDB_VERSION_STRING));
         rb_define_singleton_method(mLMDB, "new", environment_new, -1);
@@ -1123,11 +1128,40 @@ void Init_lmdb_ext() {
         VERSION_CONST(PATCH)
 #undef VERSION_CONST
 
+        /**
+         * Document-class: LMDB::Error
+         *
+         * A general class of exceptions raised within the LMDB gem.
+         */
         cError = rb_define_class_under(mLMDB, "Error", rb_eRuntimeError);
 #define ERROR(name) cError_##name = rb_define_class_under(cError, #name, cError);
 #include "errors.h"
 #undef ERROR
 
+        /**
+         * Document-class: LMDB::Environment
+         *
+         * The Environment is the root object for all LMDB operations.
+         *
+         * An LMDB "environment" is a collection of one or more "databases"
+         * (key-value tables), along with transactions to modify those
+         * databases and cursors to iterate through them.
+         *
+         * An environment -- and its collection of databases -- is normally
+         * stored in a directory.  That directory will contain two files:
+         * * +data.mdb+: all the records in all the databases in the environment
+         * * +lock.mdb+: state of transactions that may be going on in the environment.
+         *
+         * An environment can contain multiple databases.  Each of the
+         * databases has a string name ("mydatabase", "db.3.1982").  You use
+         * the database name to open the database within the environment.
+         *
+         * @example The normal pattern for using LMDB in Ruby
+         *    env = Environment.new "databasedir"
+         *    db = env.database "databasename"
+         *    # ... do things to the database ...
+         *    env.close
+         */
         cEnvironment = rb_define_class_under(mLMDB, "Environment", rb_cObject);
         rb_define_singleton_method(cEnvironment, "new", environment_new, -1);
         rb_define_method(cEnvironment, "database", environment_database, -1);
@@ -1143,6 +1177,31 @@ void Init_lmdb_ext() {
         rb_define_method(cEnvironment, "path", environment_path, 0);
         rb_define_method(cEnvironment, "transaction", environment_transaction, -1);
 
+        /**
+         * Document-class: LMDB::Database
+         *
+         * An LMDB Database is a table of key-value pairs.  It is stored as
+         * part of the {Environment}.
+         *
+         * By default, each key in a Database maps to one value.  However, a
+         * Database can be configured at creation to allow duplicate keys, in
+         * which case one key will map to multiple values.
+         *
+         * A Database stores the keys in a sorted order.  The order can also
+         * be set with options when the database is created.
+         *
+         * The basic operations on a database are to {#put}, {#get}, and
+         * {#delete} records.  One can also iterate through the records in a
+         * database using a {Cursor}.
+         *
+         * @example Typical usage
+         *    env = Environment.new "databasedir"
+         *    db = env.database "databasename"
+         *    db.put "key1", "value1"
+         *    db.put "key2", "value2"
+         *    db.get "key1"              #=> "value1"
+         *    env.close
+         */
         cDatabase = rb_define_class_under(mLMDB, "Database", rb_cObject);
         rb_undef_method(rb_singleton_class(cDatabase), "new");
         rb_define_method(cDatabase, "stat", database_stat, 0);
@@ -1153,11 +1212,94 @@ void Init_lmdb_ext() {
         rb_define_method(cDatabase, "delete", database_delete, -1);
         rb_define_method(cDatabase, "cursor", database_cursor, 0);
 
+        /**
+         * Document-class: LMDB::Transaction
+         *
+         * The LMDB environment supports transactional reads and updates.  By
+         * default, these provide the standard ACID (atomicity, consistency,
+         * isolation, durability) behaviors.
+         *
+         * Transactions can be committed or aborted.  When a transaction is
+         * committed, all its effects take effect in the database atomically.
+         * When a transaction is aborted, none of its effects take effect.
+         *
+         * Transactions span the entire environment.  All the updates made in
+         * the course of an update transaction -- writing records across all
+         * databases, creating databases, and destroying databases -- are
+         * either completed atomically or rolled back.
+         *
+         * Transactions can be nested.  A child transaction can be started
+         * within a parent transaction.  The child transaction can commit or
+         * abort, at which point the effects of the child become visible to
+         * the parent transaction or not.  If the parent aborts, all of the
+         * changes performed in the context of the parent -- including the
+         * changes from a committed child transaction -- are rolled back.
+         *
+         * To create a transaction, call {Environment#transaction} and supply
+         * a block for the code to execute in that transaction.
+         *
+         * @example Typical usage
+         *    env = Environment.new "databasedir"
+         *    db1 = env.database "database1"
+         *    env.transaction do |parent|
+         *      db2 = env.database "database2", :create => true
+         *                            #=> creates a new database, but it isn't
+         *                            #=> yet committed to storage
+         *      db1['x']              #=> nil
+         *      env.transaction do |child1|
+         *        db2['a'] = 'b'
+         *        db1['x'] = 'y'
+         *      end
+         *                            #=> first child transaction commits
+         *                            #=> changes are visible within the parent transaction
+         *                            #=> but are not yet permanent
+         *      db1['x']              #=> 'y'
+         *      db2['a']              #=> 'a'
+         *      env.transaction do |child2|
+         *        db2['a'] = 'def'
+         *        db1['x'] = 'ghi'
+         *        child2.abort
+         *                            #=> second child transaction aborts and rolls
+         *                            #=> back its changes
+         *      end
+         *      db1['x']              #=> 'y'
+         *      db2['a']              #=> 'a'
+         *    end
+         *                            #=> parent transaction commits and writes database2
+         *                            #=> and the updates from transaction child1 to
+         *                            #=> storage.
+         */
         cTransaction = rb_define_class_under(mLMDB, "Transaction", rb_cObject);
         rb_undef_method(rb_singleton_class(cTransaction), "new");
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
 
+        /**
+         * Document-class: LMDB::Cursor
+         *
+         * A Cursor points to records in a database, and is used to iterate
+         * through the records in the database.
+         *
+         * Cursors are created in the context of a transaction, and should
+         * only be used as long as that transaction is active.  In other words,
+         * after you {Transaction#commit} or {Transaction#abort} a transaction,
+         * the cursors created while that transaction was active are no longer
+         * usable.
+         *
+         * To create a cursor, call {Database#cursor} and pass it a block for
+         * that should be performed using the cursor.
+         *
+         * @example Typical usage
+         *    env = Environment.new "databasedir"
+         *    db = env.database "databasename"
+         *    db.cursor do |cursor|
+         *      rl = cursor.last           #=> content of the last record
+         *      r1 = cursor.first          #=> content of the first record
+         *      r2 = cursor.next           #=> content of the second record
+         *      cursor.put "x", "y", current: true
+         *                                 #=> replaces the second record with a new value "y"
+         *    end
+         */
         cCursor = rb_define_class_under(mLMDB, "Cursor", rb_cObject);
         rb_undef_method(rb_singleton_class(cCursor), "new");
         rb_define_method(cCursor, "close", cursor_close, 0);
