@@ -1314,7 +1314,7 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "prev", cursor_prev, 0);
         rb_define_method(cCursor, "set", cursor_set, 1);
         rb_define_method(cCursor, "set_range", cursor_set_range, 1);
-        rb_define_method(cCursor, "put", cursor_put, 0);
+        rb_define_method(cCursor, "put", cursor_put, -1);
         rb_define_method(cCursor, "count", cursor_count, 0);
-        rb_define_method(cCursor, "delete", cursor_delete, 0);
+        rb_define_method(cCursor, "delete", cursor_delete, -1);
 }
