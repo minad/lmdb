@@ -1,3 +1,7 @@
+0.4.1
+
+  * Fix #10
+
 0.4.0
 
   * Print warnings if open LMDB objects are found during garbage collection
