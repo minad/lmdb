@@ -24,7 +24,12 @@ module LMDB
     #      no record with that key
     # @see #get(key)
     def [](key)
-      get(key)
+      value = get(key)
+      if value && value[0] == "\x04"
+        Marshal.load(value)
+      else
+        value
+      end
     end
 
     # Set (write or update) a record in a database.
@@ -37,7 +42,12 @@ module LMDB
     #      db['b'] = 1234    #=> 1234
     #      db['a']           #=> 'b'
     def []=(key, value)
-      put(key, value)
+      if value.is_a? String
+        put(key, value)
+      else
+        serialized_value = Marshal.dump(value)
+        put(key, serialized_value)
+      end
       value
     end
 
