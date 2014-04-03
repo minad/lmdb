@@ -58,11 +58,9 @@ module LMDB
 
     private
       def load_serialized(value)
-        begin
-          Marshal.load(value)
-        rescue TypeError
-          value
-        end
+        Marshal.load(value)
+      rescue TypeError
+        value
       end
   end
 end
