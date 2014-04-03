@@ -26,7 +26,7 @@ module LMDB
     def [](key)
       value = get(key)
       if value && value[0] == "\x04"
-        Marshal.load(value)
+        load_serialized(value)
       else
         value
       end
@@ -55,5 +55,14 @@ module LMDB
     def size
       stat[:entries]
     end
+
+    private
+      def load_serialized(value)
+        begin
+          Marshal.load(value)
+        rescue TypeError
+          value
+        end
+      end
   end
 end
