@@ -189,6 +189,13 @@ describe LMDB do
       subject.get('cat').should == 'garfield'
     end
 
+    it 'should support serialization' do
+      fauna_hash = { :cat => 'garfield' }
+      subject['fauna'].should be_nil
+      (subject['fauna'] = fauna_hash).should == fauna_hash
+      subject['fauna'].should == fauna_hash
+    end
+
     it 'stores key/values in same transaction' do
       db.put('key', 'value').should be_nil
       db.get('key').should == 'value'
