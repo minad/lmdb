@@ -287,5 +287,9 @@ describe LMDB do
         c.set_range('\x00').should == ['key1', 'value1']
       end
     end
+
+    it 'should raise without block or txn' do
+      proc { db.cursor.next }.should raise_error(LMDB::Error)
+    end
   end
 end

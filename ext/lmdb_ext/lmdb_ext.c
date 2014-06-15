@@ -855,10 +855,13 @@ static VALUE cursor_close(VALUE self) {
 
 /**
  * @overload cursor
- *   Create a cursor to iterate through a database.
+ *   Create a cursor to iterate through a database. Uses current
+ *   transaction, if any. Otherwise, if called with a block,
+ *   creates a new transaction for the scope of the block.
+ *   Otherwise, fails.
  *
  *   @see Cursor
- *   @yield [cursor] A block to be executed with the cursor
+ *   @yield [cursor] A block to be executed with the cursor.
  *   @yieldparam cursor [Cursor] The cursor to be used to iterate
  *   @example
  *    db = env.database "abc"
@@ -869,8 +872,12 @@ static VALUE cursor_close(VALUE self) {
  */
 static VALUE database_cursor(VALUE self) {
         DATABASE(self, database);
-        if (!active_txn(database->env))
+        if (!active_txn(database->env)) {
+                if (!rb_block_given_p()) {
+                        rb_raise(cError, "Must call with block or active transaction.");
+                }
                 return call_with_transaction(database->env, self, "cursor", 0, 0, 0);
+        }
 
         MDB_cursor* cur;
         check(mdb_cursor_open(need_txn(database->env), database->dbi, &cur));
