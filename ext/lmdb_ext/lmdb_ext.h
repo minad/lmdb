@@ -46,6 +46,7 @@ typedef struct {
         VALUE    env;
         VALUE    parent;
         VALUE    thread;
+        VALUE    cursors;
         MDB_txn* txn;
 } Transaction;
 

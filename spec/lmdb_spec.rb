@@ -291,5 +291,11 @@ describe LMDB do
     it 'should raise without block or txn' do
       proc { db.cursor.next }.should raise_error(LMDB::Error)
     end
+
+    it 'should raise outside txn' do
+      c = nil
+      env.transaction { c = db.cursor }
+      proc { c.next }.should raise_error(LMDB::Error)
+    end
   end
 end

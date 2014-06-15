@@ -110,6 +110,13 @@ static void transaction_finish(VALUE self, int commit) {
         else
                 mdb_txn_abort(transaction->txn);
 
+        long i;
+        for (i=0; i<RARRAY_LEN(transaction->cursors); i++) {
+                VALUE cursor = RARRAY_AREF(transaction->cursors, i);
+                cursor_close(cursor);
+        }
+        rb_ary_clear(transaction->cursors);
+
         // Mark child transactions as closed
         p = environment_active_txn(transaction->env);
         while (p != self) {
@@ -153,6 +160,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         transaction->env = venv;
         transaction->txn = txn;
         transaction->thread = rb_thread_current();
+        transaction->cursors = rb_ary_new();
         environment_set_active_txn(venv, transaction->thread, vtxn);
 
         int exception;
@@ -896,6 +904,16 @@ static VALUE database_cursor(VALUE self) {
                 }
                 cursor_close(vcur);
                 return ret;
+        }
+        else {
+                VALUE vtxn = environment_active_txn(database->env);
+                if (NIL_P(vtxn)) {
+                        rb_fatal("Internal error: transaction finished unexpectedly.");
+                }
+                else {
+                        TRANSACTION(vtxn, txn);
+                        rb_ary_push(txn->cursors, vcur);
+                }
         }
 
         return vcur;
