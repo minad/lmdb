@@ -25,20 +25,20 @@ describe LMDB do
     describe 'new' do
       it 'returns environment' do
         env = LMDB::Environment.new(path)
-        env.should be_instance_of(described_class::Environment)
+        env.should be_instance_of(described_class)
         env.close
       end
 
       it 'accepts block' do
         LMDB::Environment.new(path) do |env|
-          env.should be_instance_of(described_class::Environment)
+          env.should be_instance_of(described_class)
           42
         end.should == 42
       end
 
       it 'accepts options' do
         env = LMDB::Environment.new(path, :nosync => true, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
-        env.should be_instance_of(described_class::Environment)
+        env.should be_instance_of(described_class)
         env.info[:maxreaders].should == 777
         env.info[:mapsize].should == 111111
         env.flags.should include(:nosync)
@@ -93,14 +93,14 @@ describe LMDB do
       subject.flags.should_not include(:nosync)
     end
 
-    describe 'transaction' do
+    describe LMDB::Transaction do
       subject { env}
 
       it 'should create transactions' do
         subject.active_txn.should == nil
         subject.transaction do |txn|
           subject.active_txn.should == txn
-          txn.should be_instance_of(described_class::Transaction)
+          txn.should be_instance_of(described_class)
           txn.abort
           subject.active_txn.should == nil
         end
@@ -111,7 +111,7 @@ describe LMDB do
         subject.active_txn.should == nil
         subject.transaction(true) do |txn|
           subject.active_txn.should == txn
-          txn.should be_instance_of(described_class::Transaction)
+          txn.should be_instance_of(described_class)
           txn.abort
           subject.active_txn.should == nil
         end
