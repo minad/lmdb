@@ -119,7 +119,7 @@
  *
  *	@author	Howard Chu, Symas Corporation.
  *
- *	@copyright Copyright 2011-2013 Howard Chu, Symas Corp. All rights reserved.
+ *	@copyright Copyright 2011-2014 Howard Chu, Symas Corp. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted only as authorized by the OpenLDAP
@@ -184,7 +184,7 @@ typedef int mdb_filehandle_t;
 /** Library minor version */
 #define MDB_VERSION_MINOR	9
 /** Library patch version */
-#define MDB_VERSION_PATCH	10
+#define MDB_VERSION_PATCH	12
 
 /** Combine args a,b,c into a single integer for easy version comparisons */
 #define MDB_VERINT(a,b,c)	(((a) << 24) | ((b) << 16) | (c))
@@ -194,7 +194,7 @@ typedef int mdb_filehandle_t;
 	MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH)
 
 /** The release date of this library version */
-#define MDB_VERSION_DATE	"November 11, 2013"
+#define MDB_VERSION_DATE	"June 13, 2014"
 
 /** A stringifier for the version info */
 #define MDB_VERSTR(a,b,c,d)	"MDB " #a "." #b "." #c ": (" d ")"
@@ -263,8 +263,6 @@ typedef int  (MDB_cmp_func)(const MDB_val *a, const MDB_val *b);
 typedef void (MDB_rel_func)(MDB_val *item, void *oldptr, void *newptr, void *relctx);
 
 /** @defgroup	mdb_env	Environment Flags
- *
- *	Values do not overlap Database Flags.
  *	@{
  */
 	/** mmap at a fixed address (experimental) */
@@ -292,8 +290,6 @@ typedef void (MDB_rel_func)(MDB_val *item, void *oldptr, void *newptr, void *rel
 /** @} */
 
 /**	@defgroup	mdb_dbi_open	Database Flags
- *
- *	Values do not overlap Environment Flags.
  *	@{
  */
 	/** use reverse string keys */
@@ -412,7 +408,7 @@ typedef enum MDB_cursor_op {
 #define MDB_BAD_RSLOT		(-30783)
 	/** Transaction cannot recover - it must be aborted */
 #define MDB_BAD_TXN			(-30782)
-	/** Too big key/data, key is empty, or wrong DUPFIXED size */
+	/** Unsupported size of key/DB name/data, or wrong DUPFIXED size */
 #define MDB_BAD_VALSIZE		(-30781)
 #define MDB_LAST_ERRCODE	MDB_BAD_VALSIZE
 /** @} */
@@ -672,7 +668,8 @@ void mdb_env_close(MDB_env *env);
 	/** @brief Set environment flags.
 	 *
 	 * This may be used to set some flags in addition to those from
-	 * #mdb_env_open(), or to unset these flags.
+	 * #mdb_env_open(), or to unset these flags.  If several threads
+	 * change the flags at the same time, the result is undefined.
 	 * @param[in] env An environment handle returned by #mdb_env_create()
 	 * @param[in] flags The flags to change, bitwise OR'ed together
 	 * @param[in] onoff A non-zero value sets the flags, zero clears them.
@@ -787,6 +784,10 @@ int  mdb_env_get_maxreaders(MDB_env *env, unsigned int *readers);
 	 * environment. Simpler applications that use the environment as a single
 	 * unnamed database can ignore this option.
 	 * This function may only be called after #mdb_env_create() and before #mdb_env_open().
+	 *
+	 * Currently a moderate number of slots are cheap but a huge number gets
+	 * expensive: 7-120 words per transaction, and every #mdb_dbi_open()
+	 * does a linear search of the opened slots.
 	 * @param[in] env An environment handle returned by #mdb_env_create()
 	 * @param[in] dbs The maximum number of databases
 	 * @return A non-zero error value on failure and 0 on success. Some possible
@@ -797,14 +798,46 @@ int  mdb_env_get_maxreaders(MDB_env *env, unsigned int *readers);
 	 */
 int  mdb_env_set_maxdbs(MDB_env *env, MDB_dbi dbs);
 
-	/** @brief Get the maximum size of a key for the environment.
+	/** @brief Get the maximum size of keys and #MDB_DUPSORT data we can write.
 	 *
-	 * This is the compile-time constant #MDB_MAXKEYSIZE, default 511.
+	 * Depends on the compile-time constant #MDB_MAXKEYSIZE. Default 511.
 	 * See @ref MDB_val.
 	 * @param[in] env An environment handle returned by #mdb_env_create()
-	 * @return The maximum size of a key
+	 * @return The maximum size of a key we can write
 	 */
 int  mdb_env_get_maxkeysize(MDB_env *env);
+
+	/** @brief Set application information associated with the #MDB_env.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create()
+	 * @param[in] ctx An arbitrary pointer for whatever the application needs.
+	 * @return A non-zero error value on failure and 0 on success.
+	 */
+int  mdb_env_set_userctx(MDB_env *env, void *ctx);
+
+	/** @brief Get the application information associated with the #MDB_env.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create()
+	 * @return The pointer set by #mdb_env_set_userctx().
+	 */
+void *mdb_env_get_userctx(MDB_env *env);
+
+	/** @brief A callback function for most MDB assert() failures,
+	 * called before printing the message and aborting.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create().
+	 * @param[in] msg The assertion message, not including newline.
+	 */
+typedef void MDB_assert_func(MDB_env *env, const char *msg);
+
+	/** Set or reset the assert() callback of the environment.
+	 * Disabled if liblmdb is buillt with NDEBUG.
+	 * @note This hack should become obsolete as lmdb's error handling matures.
+	 * @param[in] env An environment handle returned by #mdb_env_create().
+	 * @param[in] func An #MDB_assert_func function, or 0.
+	 * @return A non-zero error value on failure and 0 on success.
+	 */
+int  mdb_env_set_assert(MDB_env *env, MDB_assert_func *func);
 
 	/** @brief Create a transaction for use with the environment.
 	 *
@@ -922,7 +955,7 @@ int  mdb_txn_renew(MDB_txn *txn);
 	 * independently of whether such a database exists.
 	 * The database handle may be discarded by calling #mdb_dbi_close().
 	 * The old database handle is returned if the database was already open.
-	 * The handle must only be closed once.
+	 * The handle may only be closed once.
 	 * The database handle will be private to the current transaction until
 	 * the transaction is successfully committed. If the transaction is
 	 * aborted the handle will be closed automatically.
@@ -934,7 +967,8 @@ int  mdb_txn_renew(MDB_txn *txn);
 	 * use this function.
 	 *
 	 * To use named databases (with name != NULL), #mdb_env_set_maxdbs()
-	 * must be called before opening the environment.
+	 * must be called before opening the environment.  Database names
+	 * are kept as keys in the unnamed database.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] name The name of the database to open. If only a single
 	 * 	database is needed in the environment, this value may be NULL.
@@ -1004,12 +1038,19 @@ int  mdb_stat(MDB_txn *txn, MDB_dbi dbi, MDB_stat *stat);
 	 */
 int mdb_dbi_flags(MDB_txn *txn, MDB_dbi dbi, unsigned int *flags);
 
-	/** @brief Close a database handle.
+	/** @brief Close a database handle. Normally unnecessary. Use with care:
 	 *
 	 * This call is not mutex protected. Handles should only be closed by
 	 * a single thread, and only if no other threads are going to reference
 	 * the database handle or one of its cursors any further. Do not close
 	 * a handle if an existing transaction has modified its database.
+	 * Doing so can cause misbehavior from database corruption to errors
+	 * like MDB_BAD_VALSIZE (since the DB name is gone).
+	 *
+	 * Closing a database handle is not necessary, but lets #mdb_dbi_open()
+	 * reuse the handle value.  Usually it's better to set a bigger
+	 * #mdb_env_set_maxdbs(), unless that value would be large.
+	 *
 	 * @param[in] env An environment handle returned by #mdb_env_create()
 	 * @param[in] dbi A database handle returned by #mdb_dbi_open()
 	 */
@@ -1017,6 +1058,7 @@ void mdb_dbi_close(MDB_env *env, MDB_dbi dbi);
 
 	/** @brief Empty or delete+close a database.
 	 *
+	 * See #mdb_dbi_close() for restrictions about closing the DB handle.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] dbi A database handle returned by #mdb_dbi_open()
 	 * @param[in] del 0 to empty the DB, 1 to delete it from the
@@ -1294,9 +1336,9 @@ int  mdb_cursor_get(MDB_cursor *cursor, MDB_val *key, MDB_val *data,
 	/** @brief Store by cursor.
 	 *
 	 * This function stores key/data pairs into the database.
-	 * If the function fails for any reason, the state of the cursor will be
-	 * unchanged. If the function succeeds and an item is inserted into the
-	 * database, the cursor is always positioned to refer to the newly inserted item.
+	 * The cursor is positioned at the new item, or on failure usually near it.
+	 * @note Earlier documentation incorrectly said errors would leave the
+	 * state of the cursor unchanged.
 	 * @param[in] cursor A cursor handle returned by #mdb_cursor_open()
 	 * @param[in] key The key operated on.
 	 * @param[in] data The data operated on.
@@ -1305,7 +1347,9 @@ int  mdb_cursor_get(MDB_cursor *cursor, MDB_val *key, MDB_val *data,
 	 * <ul>
 	 *	<li>#MDB_CURRENT - overwrite the data of the key/data pair to which
 	 *		the cursor refers with the specified data item. The \b key
-	 *		parameter is ignored.
+	 *		parameter is not used for positioning the cursor, but should
+	 *		still be provided. If using sorted duplicates (#MDB_DUPSORT)
+	 *		the data item must still sort into the same place.
 	 *	<li>#MDB_NODUPDATA - enter the new key/data pair only if it does not
 	 *		already appear in the database. This flag may only be specified
 	 *		if the database was opened with #MDB_DUPSORT. The function will
@@ -1409,7 +1453,7 @@ int  mdb_dcmp(MDB_txn *txn, MDB_dbi dbi, const MDB_val *a, const MDB_val *b);
 	 *
 	 * @param[in] msg The string to be printed.
 	 * @param[in] ctx An arbitrary context pointer for the callback.
-	 * @return < 0 on failure, 0 on success.
+	 * @return < 0 on failure, >= 0 on success.
 	 */
 typedef int (MDB_msg_func)(const char *msg, void *ctx);
 
@@ -1418,7 +1462,7 @@ typedef int (MDB_msg_func)(const char *msg, void *ctx);
 	 * @param[in] env An environment handle returned by #mdb_env_create()
 	 * @param[in] func A #MDB_msg_func function
 	 * @param[in] ctx Anything the message function needs
-	 * @return < 0 on failure, 0 on success.
+	 * @return < 0 on failure, >= 0 on success.
 	 */
 int	mdb_reader_list(MDB_env *env, MDB_msg_func *func, void *ctx);
 
