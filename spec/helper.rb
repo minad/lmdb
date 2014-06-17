@@ -24,5 +24,7 @@ end
 RSpec.configure do |c|
   c.include LMDB::SpecHelper
   c.after { FileUtils.rm_rf TEMP_ROOT }
+  c.expect_with :rspec do |cc|
+    cc.syntax = :should
+  end
 end
-
