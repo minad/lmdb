@@ -1,4 +1,5 @@
 #include "lmdb_ext.h"
+#include "ruby/thread.h"
 
 static void check(int code) {
         if (!code)
@@ -148,11 +149,45 @@ static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int
         return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
+typedef struct {
+        MDB_env *env;
+        MDB_txn *parent;
+        unsigned int flags;
+        MDB_txn **htxn;
+        int result;
+} TxnArgs;
+
+static void *call_txn_begin(void *arg) {
+        TxnArgs *txn_args = arg;
+        txn_args->result = mdb_txn_begin(txn_args->env,
+          txn_args->parent, txn_args->flags, txn_args->htxn);
+        return (void *)NULL;
+}
+
+static void stop_txn_begin(void *arg)
+{
+        //TxnArgs *txn_args = arg;
+        //rb_warn("Tried to stop mdb_txn_begin.");
+        // txn_args->stop = Qtrue;
+}
+
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags) {
         ENVIRONMENT(venv, environment);
 
         MDB_txn* txn;
-        check(mdb_txn_begin(environment->env, active_txn(venv), flags, &txn));
+
+        TxnArgs txn_args;
+        txn_args.env = environment->env;
+        txn_args.parent = active_txn(venv);
+        txn_args.flags = flags;
+        txn_args.htxn = &txn;
+        txn_args.result = 0;
+
+        rb_thread_call_without_gvl(
+                call_txn_begin, &txn_args,
+                stop_txn_begin, &txn_args);
+
+        check(txn_args.result);
 
         Transaction* transaction;
         VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_free, transaction);
