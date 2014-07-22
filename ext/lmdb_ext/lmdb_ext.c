@@ -183,9 +183,14 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
         txn_args.htxn = &txn;
         txn_args.result = 0;
 
-        rb_thread_call_without_gvl(
-                call_txn_begin, &txn_args,
-                stop_txn_begin, &txn_args);
+        if (flags & MDB_RDONLY) {
+                call_txn_begin(&txn_args);
+        }
+        else {
+                rb_thread_call_without_gvl(
+                    call_txn_begin, &txn_args,
+                    stop_txn_begin, &txn_args);
+        }
 
         check(txn_args.result);
 
