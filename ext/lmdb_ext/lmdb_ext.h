@@ -24,6 +24,11 @@
 #  endif
 #endif
 
+// Ruby 2.0 compatibility
+#ifndef RARRAY_AREF
+#  define RARRAY_AREF(ary,n) (RARRAY_PTR(ary)[n])
+#endif
+
 #define ENVIRONMENT(var, var_env)                       \
         Environment* var_env;                           \
         Data_Get_Struct(var, Environment, var_env);     \
