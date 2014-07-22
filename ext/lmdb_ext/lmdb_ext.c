@@ -149,14 +149,6 @@ static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int
         return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
-typedef struct {
-        MDB_env *env;
-        MDB_txn *parent;
-        unsigned int flags;
-        MDB_txn **htxn;
-        int result;
-} TxnArgs;
-
 static void *call_txn_begin(void *arg) {
         TxnArgs *txn_args = arg;
         txn_args->result = mdb_txn_begin(txn_args->env,
