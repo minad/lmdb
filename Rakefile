@@ -15,7 +15,7 @@ task :default => [:compile, :spec]
 
 def version
   @version ||= begin
-    require '#{PRJ}/version'
+    require "#{PRJ}/version"
     warn "LMDB::VERSION not a string" unless LMDB::VERSION.kind_of? String
     LMDB::VERSION
   end
