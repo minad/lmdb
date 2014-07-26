@@ -1,4 +1,5 @@
 #include "lmdb_ext.h"
+#include "ruby/thread.h"
 
 static void check(int code) {
         if (!code)
@@ -148,11 +149,58 @@ static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int
         return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
+static void *call_txn_begin(void *arg) {
+        TxnArgs *txn_args = arg;
+        txn_args->result = mdb_txn_begin(txn_args->env,
+          txn_args->parent, txn_args->flags, txn_args->htxn);
+        return (void *)NULL;
+}
+
+static void stop_txn_begin(void *arg)
+{
+        TxnArgs *txn_args = arg;
+        // There's no way to stop waiting for mutex:
+        //   http://www.cognitus.net/faq/pthread/pthreadSemiFAQ_6.html
+        // However, we can (and must) release the mutex as soon as we get it:
+        txn_args->stop = 1;
+}
+
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags) {
         ENVIRONMENT(venv, environment);
 
         MDB_txn* txn;
-        check(mdb_txn_begin(environment->env, active_txn(venv), flags, &txn));
+        TxnArgs txn_args;
+
+    retry:
+        txn = NULL;
+
+        txn_args.env = environment->env;
+        txn_args.parent = active_txn(venv);
+        txn_args.flags = flags;
+        txn_args.htxn = &txn;
+        txn_args.result = 0;
+        txn_args.stop = 0;
+
+        if (flags & MDB_RDONLY) {
+                call_txn_begin(&txn_args);
+        }
+        else {
+                rb_thread_call_without_gvl2(
+                    call_txn_begin, &txn_args,
+                    stop_txn_begin, &txn_args);
+
+                if (txn_args.stop || !txn) {
+                        // !txn is when rb_thread_call_without_gvl2
+                        // returns before calling txn_begin
+                        if (txn) {
+                                mdb_txn_abort(txn);
+                        }
+                        rb_thread_check_ints();
+                        goto retry; // in what cases do we get here?
+                }
+        }
+
+        check(txn_args.result);
 
         Transaction* transaction;
         VALUE vtxn = Data_Make_Struct(cTransaction, Transaction, transaction_mark, transaction_free, transaction);
