@@ -15,7 +15,7 @@ task :default => [:compile, :spec]
 
 def version
   @version ||= begin
-    require '#{PRJ}/version'
+    require "#{PRJ}/version"
     warn "LMDB::VERSION not a string" unless LMDB::VERSION.kind_of? String
     LMDB::VERSION
   end
@@ -49,7 +49,7 @@ task :release => "release:is_new_version" do
   sh "git push"
   sh "git push --tags"
 
-  sh "gem push #{tag}.gem"
+  sh "gem push #{PRJ}-#{version}.gem"
 end
 
 namespace :release do
