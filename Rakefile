@@ -49,7 +49,7 @@ task :release => "release:is_new_version" do
   sh "git push"
   sh "git push --tags"
 
-  sh "gem push #{tag}.gem"
+  sh "gem push #{PRJ}-#{version}.gem"
 end
 
 namespace :release do
