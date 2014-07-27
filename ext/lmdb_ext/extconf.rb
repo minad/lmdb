@@ -19,5 +19,8 @@ have_header 'assert.h'
 
 have_header 'ruby.h'
 have_func 'rb_funcall_passing_block'
+have_func 'rb_thread_call_without_gvl2'
+
+create_header
 
 create_makefile('lmdb_ext')
