@@ -1,5 +1,24 @@
 #include "lmdb_ext.h"
+#include "extconf.h"
+
+#ifdef HAVE_RB_THREAD_CALL_WITHOUT_GVL2
+
+// ruby 2
 #include "ruby/thread.h"
+#define CALL_WITHOUT_GVL(func, data1, ubf, data2) \
+  rb_thread_call_without_gvl2(func, data1, ubf, data2)
+
+#else
+
+// ruby 193
+// Expose the API from internal.h:
+VALUE rb_thread_call_without_gvl(
+    rb_blocking_function_t *func, void *data1,
+    rb_unblock_function_t *ubf, void *data2);
+#define CALL_WITHOUT_GVL(func, data1, ubf, data2) \
+  rb_thread_call_without_gvl((rb_blocking_function_t *)func, data1, ubf, data2)
+
+#endif
 
 static void check(int code) {
         if (!code)
@@ -185,7 +204,7 @@ static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flag
                 call_txn_begin(&txn_args);
         }
         else {
-                rb_thread_call_without_gvl2(
+                CALL_WITHOUT_GVL(
                     call_txn_begin, &txn_args,
                     stop_txn_begin, &txn_args);
 
