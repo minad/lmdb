@@ -356,7 +356,8 @@ static VALUE environment_info(VALUE self) {
  */
 static VALUE environment_copy(VALUE self, VALUE path) {
         ENVIRONMENT(self, environment);
-        check(mdb_env_copy(environment->env, StringValueCStr(path)));
+        VALUE expanded_path = rb_file_expand_path(path, Qnil);
+        check(mdb_env_copy(environment->env, StringValueCStr(expanded_path)));
         return Qnil;
 }
 
@@ -470,7 +471,8 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
                 check(mdb_env_set_mapsize(env, options.mapsize));
 
         check(mdb_env_set_maxdbs(env, options.maxdbs <= 0 ? 1 : options.maxdbs));
-        check(mdb_env_open(env, StringValueCStr(path), options.flags, options.mode));
+        VALUE expanded_path = rb_file_expand_path(path, Qnil);
+        check(mdb_env_open(env, StringValueCStr(expanded_path), options.flags, options.mode));
 
         if (rb_block_given_p())
                 return rb_ensure(rb_yield, venv, environment_close, venv);
