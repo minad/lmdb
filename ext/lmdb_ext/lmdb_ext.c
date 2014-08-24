@@ -38,8 +38,8 @@ static void check(int code) {
 
 static void transaction_free(Transaction* transaction) {
         if (transaction->txn) {
-                rb_warn("Memory leak - Garbage collecting active transaction");
-                //mdb_txn_abort(transaction->txn);
+                //rb_warn("Memory leak - Garbage collecting active transaction");
+                mdb_txn_abort(transaction->txn);
         }
         free(transaction);
 }
@@ -173,6 +173,11 @@ static void *call_txn_begin(void *arg) {
         TxnArgs *txn_args = arg;
         txn_args->result = mdb_txn_begin(txn_args->env,
           txn_args->parent, txn_args->flags, txn_args->htxn);
+        if (txn_args->result == MDB_MAP_RESIZED) {
+            check(mdb_env_set_mapsize(txn_args->env, 0));
+            txn_args->result = mdb_txn_begin(txn_args->env,
+              txn_args->parent, txn_args->flags, txn_args->htxn);
+        }
         return (void *)NULL;
 }
 
@@ -251,8 +256,8 @@ static void environment_check(Environment* environment) {
 
 static void environment_free(Environment *environment) {
         if (environment->env) {
-                rb_warn("Memory leak - Garbage collecting open environment");
-                //mdb_env_close(environment->env);
+                //rb_warn("Memory leak - Garbage collecting open environment");
+                mdb_env_close(environment->env);
         }
         free(environment);
 }
@@ -521,6 +526,12 @@ static VALUE environment_path(VALUE self) {
         ENVIRONMENT(self, environment);
         check(mdb_env_get_path(environment->env, &path));
         return rb_str_new2(path);
+}
+
+static VALUE environment_set_mapsize(VALUE self, VALUE size) {
+        ENVIRONMENT(self, environment);
+        check(mdb_env_set_mapsize(environment->env, NUM2LONG(size)));
+        return Qnil;
 }
 
 static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set) {
@@ -904,8 +915,8 @@ static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
 
 static void cursor_free(Cursor* cursor) {
         if (cursor->cur) {
-                rb_warn("Memory leak - Garbage collecting open cursor");
-                //mdb_cursor_close(cursor->cur);
+                //rb_warn("Memory leak - Garbage collecting open cursor");
+                mdb_cursor_close(cursor->cur);
         }
 
         free(cursor);
@@ -1270,6 +1281,7 @@ void Init_lmdb_ext() {
         rb_define_method(cEnvironment, "info", environment_info, 0);
         rb_define_method(cEnvironment, "copy", environment_copy, 1);
         rb_define_method(cEnvironment, "sync", environment_sync, -1);
+        rb_define_method(cEnvironment, "mapsize=", environment_set_mapsize, 1);
         rb_define_method(cEnvironment, "set_flags", environment_set_flags, -1);
         rb_define_method(cEnvironment, "clear_flags", environment_clear_flags, -1);
         rb_define_method(cEnvironment, "flags", environment_flags, 0);
