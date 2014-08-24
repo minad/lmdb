@@ -523,6 +523,12 @@ static VALUE environment_path(VALUE self) {
         return rb_str_new2(path);
 }
 
+static VALUE environment_set_mapsize(VALUE self, VALUE size) {
+        ENVIRONMENT(self, environment);
+        check(mdb_env_set_mapsize(environment->env, NUM2LONG(size)));
+        return Qnil;
+}
+
 static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set) {
         ENVIRONMENT(self, environment);
 
@@ -1270,6 +1276,7 @@ void Init_lmdb_ext() {
         rb_define_method(cEnvironment, "info", environment_info, 0);
         rb_define_method(cEnvironment, "copy", environment_copy, 1);
         rb_define_method(cEnvironment, "sync", environment_sync, -1);
+        rb_define_method(cEnvironment, "mapsize=", environment_set_mapsize, 1);
         rb_define_method(cEnvironment, "set_flags", environment_set_flags, -1);
         rb_define_method(cEnvironment, "clear_flags", environment_clear_flags, -1);
         rb_define_method(cEnvironment, "flags", environment_flags, 0);

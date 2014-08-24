@@ -70,6 +70,12 @@ describe LMDB do
       info[:numreaders].should be_instance_of(Fixnum)
     end
 
+    it 'should set mapsize' do
+      size_before = env.info[:mapsize]
+      env.mapsize = size_before * 2
+      env.info[:mapsize].should == size_before * 2
+    end
+
     it 'should copy' do
       target = mkpath('copy')
       subject.copy(target).should be_nil
