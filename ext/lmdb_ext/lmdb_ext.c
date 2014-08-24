@@ -38,8 +38,8 @@ static void check(int code) {
 
 static void transaction_free(Transaction* transaction) {
         if (transaction->txn) {
-                rb_warn("Memory leak - Garbage collecting active transaction");
-                //mdb_txn_abort(transaction->txn);
+                //rb_warn("Memory leak - Garbage collecting active transaction");
+                mdb_txn_abort(transaction->txn);
         }
         free(transaction);
 }
@@ -173,6 +173,11 @@ static void *call_txn_begin(void *arg) {
         TxnArgs *txn_args = arg;
         txn_args->result = mdb_txn_begin(txn_args->env,
           txn_args->parent, txn_args->flags, txn_args->htxn);
+        if (txn_args->result == MDB_MAP_RESIZED) {
+            check(mdb_env_set_mapsize(txn_args->env, 0));
+            txn_args->result = mdb_txn_begin(txn_args->env,
+              txn_args->parent, txn_args->flags, txn_args->htxn);
+        }
         return (void *)NULL;
 }
 
@@ -251,8 +256,8 @@ static void environment_check(Environment* environment) {
 
 static void environment_free(Environment *environment) {
         if (environment->env) {
-                rb_warn("Memory leak - Garbage collecting open environment");
-                //mdb_env_close(environment->env);
+                //rb_warn("Memory leak - Garbage collecting open environment");
+                mdb_env_close(environment->env);
         }
         free(environment);
 }
@@ -910,8 +915,8 @@ static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
 
 static void cursor_free(Cursor* cursor) {
         if (cursor->cur) {
-                rb_warn("Memory leak - Garbage collecting open cursor");
-                //mdb_cursor_close(cursor->cur);
+                //rb_warn("Memory leak - Garbage collecting open cursor");
+                mdb_cursor_close(cursor->cur);
         }
 
         free(cursor);
