@@ -47,6 +47,7 @@ static void transaction_free(Transaction* transaction) {
 static void transaction_mark(Transaction* transaction) {
         rb_gc_mark(transaction->parent);
         rb_gc_mark(transaction->env);
+        rb_gc_mark(transaction->cursors);
 }
 
 /**
