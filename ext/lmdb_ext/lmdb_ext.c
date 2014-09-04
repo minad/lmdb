@@ -256,8 +256,14 @@ static void environment_check(Environment* environment) {
 
 static void environment_free(Environment *environment) {
         if (environment->env) {
-                rb_warn("Memory leak - Garbage collecting open environment");
-                // mdb_env_close(environment->env);
+                // rb_warn("Memory leak - Garbage collecting open environment");
+                if (!RHASH_EMPTY_P(environment->txn_thread_hash)) {
+                    // If a transaction (or cursor) is open, its block is on the
+                    // stack, so it will not be collected, so environment_free
+                    // should not be called.
+                    rb_warn("Bug: closing environment with open transactions.");
+                }
+                mdb_env_close(environment->env);
         }
         free(environment);
 }
