@@ -107,6 +107,20 @@ static VALUE transaction_abort(VALUE self) {
         return Qnil;
 }
 
+/**
+ * @overload transaction_env
+ *   @return [Environment] the environment in which this transaction is running.
+ *   @example
+ *      env.transaction do |t|
+ *        env == t.env
+ *        # should be true
+ *      end
+ */
+static VALUE transaction_env(VALUE self) {
+        TRANSACTION(self, transaction);
+        return transaction->env;
+}
+
 static void transaction_finish(VALUE self, int commit) {
         TRANSACTION(self, transaction);
 
@@ -1007,6 +1021,15 @@ static VALUE database_cursor(VALUE self) {
 }
 
 /**
+ * @overload database_env
+ *   @return [Environment] the environment to which this database belongs.
+ */
+static VALUE database_env(VALUE self) {
+        DATABASE(self, database);
+        return database->env;
+}
+
+/**
  * @overload first
  *    Position the cursor to the first record in the database, and
  *    return its value.
@@ -1212,6 +1235,15 @@ static VALUE cursor_delete(int argc, VALUE *argv, VALUE self) {
 }
 
 /**
+ * @overload cursor_db
+ *   @return [Database] the database which this cursor is iterating over.
+ */
+static VALUE cursor_db(VALUE self) {
+        CURSOR(self, cursor);
+        return cursor->db;
+}
+
+/**
  * @overload count
  *    Return count of duplicates for current key.  This call is only
  *    valid on databases that support sorted duplicate data items
@@ -1328,6 +1360,7 @@ void Init_lmdb_ext() {
         rb_define_method(cDatabase, "put", database_put, -1);
         rb_define_method(cDatabase, "delete", database_delete, -1);
         rb_define_method(cDatabase, "cursor", database_cursor, 0);
+        rb_define_method(cDatabase, "env", database_env, 0);
 
         /**
          * Document-class: LMDB::Transaction
@@ -1390,6 +1423,7 @@ void Init_lmdb_ext() {
         rb_undef_method(rb_singleton_class(cTransaction), "new");
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
+        rb_define_method(cTransaction, "env", transaction_env, 0);
 
         /**
          * Document-class: LMDB::Cursor
@@ -1430,4 +1464,5 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "put", cursor_put, -1);
         rb_define_method(cCursor, "count", cursor_count, 0);
         rb_define_method(cCursor, "delete", cursor_delete, -1);
+        rb_define_method(cCursor, "database", cursor_db, 0);
 }

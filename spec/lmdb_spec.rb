@@ -169,6 +169,14 @@ describe LMDB do
         db['key'].should == 'value'
         subject.active_txn.should == nil
       end
+
+      it 'should access from transaction to environment' do
+        env2 = nil
+        env.transaction do |txn|
+          env2 = txn.env
+        end
+        env2.should == env
+      end
     end
   end
 
@@ -249,6 +257,13 @@ describe LMDB do
       db[bin1].should == bin2
       db['key'].should == bin2
     end
+
+    it 'should access environment' do
+      main = env.database
+      db1 = env.database('db1', :create => true)
+      main.env.should == env
+      db1.env.should == env
+    end
   end
 
   describe LMDB::Cursor do
@@ -302,6 +317,12 @@ describe LMDB do
       c = nil
       env.transaction { c = db.cursor }
       proc { c.next }.should raise_error(LMDB::Error)
+    end
+
+    it 'should access database' do
+      db2 = nil
+      env.transaction { c = db.cursor; db2 = c.database }
+      db2.should == db
     end
   end
 end
