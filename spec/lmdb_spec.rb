@@ -309,6 +309,15 @@ describe LMDB do
       end
     end
 
+    it 'should seek within range' do
+      db.cursor do |c|
+        db.put('key0', 'value0')
+        c.first
+        c.next_range('key1').should == ['key1', 'value1']
+        c.next_range('key1').should == nil
+      end
+    end
+
     it 'should raise without block or txn' do
       proc { db.cursor.next }.should raise_error(LMDB::Error)
     end

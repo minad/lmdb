@@ -1096,6 +1096,36 @@ static VALUE cursor_next(VALUE self) {
 }
 
 /**
+ * @overload next_range
+ *    Position the cursor to the next record in the database, and
+ *    return its value if the record's key is less than or equal to
+ *    the specified key, or nil otherwise.
+ *    @return [Array,nil] The [key, value] pair for the next record, or
+ *        nil if no next record or the next record is out of the range.
+ */
+static VALUE cursor_next_range(VALUE self, VALUE upper_bound_key) {
+        CURSOR(self, cursor);
+        MDB_val key, value, ub_key;
+
+        int ret = mdb_cursor_get(cursor->cur, &key, &value, MDB_NEXT);
+        if (ret == MDB_NOTFOUND)
+                return Qnil;
+        check(ret);
+
+        ub_key.mv_size = RSTRING_LEN(upper_bound_key);
+        ub_key.mv_data = StringValuePtr(upper_bound_key);
+
+        MDB_txn *txn = mdb_cursor_txn(cursor->cur);
+        MDB_dbi dbi = mdb_cursor_dbi(cursor->cur);
+
+        if (mdb_cmp(txn, dbi, &key, &ub_key) <= 0) {
+            return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+        } else {
+            return Qnil;
+        }
+}
+
+/**
  * @overload set(key)
  *   Set the cursor to a specified key
  *   @param key The key to which the cursor should be positioned
@@ -1458,6 +1488,7 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "first", cursor_first, 0);
         rb_define_method(cCursor, "last", cursor_last, 0);
         rb_define_method(cCursor, "next", cursor_next, 0);
+        rb_define_method(cCursor, "next_range", cursor_next_range, 1);
         rb_define_method(cCursor, "prev", cursor_prev, 0);
         rb_define_method(cCursor, "set", cursor_set, 1);
         rb_define_method(cCursor, "set_range", cursor_set_range, 1);
