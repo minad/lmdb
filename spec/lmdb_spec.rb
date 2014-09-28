@@ -100,7 +100,7 @@ describe LMDB do
     end
 
     describe LMDB::Transaction do
-      subject { env}
+      subject { env }
 
       it 'should create transactions' do
         subject.active_txn.should == nil
@@ -170,7 +170,7 @@ describe LMDB do
         subject.active_txn.should == nil
       end
 
-      it 'should access from transaction to environment' do
+      it 'should get environment' do
         env2 = nil
         env.transaction do |txn|
           env2 = txn.env
@@ -258,7 +258,7 @@ describe LMDB do
       db['key'].should == bin2
     end
 
-    it 'should access environment' do
+    it 'should get environment' do
       main = env.database
       db1 = env.database('db1', :create => true)
       main.env.should == env
@@ -328,7 +328,7 @@ describe LMDB do
       proc { c.next }.should raise_error(LMDB::Error)
     end
 
-    it 'should access database' do
+    it 'should get database' do
       db2 = nil
       env.transaction { c = db.cursor; db2 = c.database }
       db2.should == db
