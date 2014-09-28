@@ -625,6 +625,10 @@ static void environment_set_active_txn(VALUE self, VALUE thread, VALUE txn) {
                         rb_hash_delete(environment->txn_thread_hash, oldtxn);
                 }
         } else {
+                VALUE oldtxn = rb_hash_aref(environment->thread_txn_hash, thread);
+                if (!NIL_P(oldtxn)) {
+                        rb_hash_delete(environment->txn_thread_hash, oldtxn);
+                }
                 rb_hash_aset(environment->txn_thread_hash, txn, thread);
                 rb_hash_aset(environment->thread_txn_hash, thread, txn);
         }
