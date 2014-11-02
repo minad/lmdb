@@ -927,7 +927,7 @@ static VALUE database_delete(int argc, VALUE *argv, VALUE self) {
         if (NIL_P(vval)) {
                 check(mdb_del(need_txn(database->env), database->dbi, &key, 0));
         } else {
-                VALUE vval = StringValue(vval);
+                vval = StringValue(vval);
                 MDB_val value;
                 value.mv_size = RSTRING_LEN(vval);
                 value.mv_data = RSTRING_PTR(vval);

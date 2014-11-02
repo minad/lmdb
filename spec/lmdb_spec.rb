@@ -203,6 +203,19 @@ describe LMDB do
       subject.get('cat').should == 'garfield'
     end
 
+    it 'should delete by key' do
+      proc { subject.delete('cat') }.should raise_error(LMDB::Error::NOTFOUND)
+      proc { subject.delete('cat', 'garfield') }.should raise_error(LMDB::Error::NOTFOUND)
+
+      subject.put('cat', 'garfield')
+      subject.delete('cat').should be_nil
+      proc { subject.delete('cat') }.should raise_error(LMDB::Error::NOTFOUND)
+
+      subject.put('cat', 'garfield')
+      subject.delete('cat', 'garfield').should be_nil
+      proc { subject.delete('cat', 'garfield') }.should raise_error(LMDB::Error::NOTFOUND)
+    end
+
     it 'stores key/values in same transaction' do
       db.put('key', 'value').should be_nil
       db.get('key').should == 'value'
