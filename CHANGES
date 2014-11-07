@@ -1,3 +1,36 @@
+0.4.8
+
+  * Fix a bug in Database#delete (#38) and add tests.
+
+0.4.7
+
+  * Fix bug in nested transations (#34).
+
+0.4.6
+
+  * Import lmdb 0.9.14 source.
+  * Handle MDB_MAP_RESIZED during transaction.
+  * Expose mdb_env_set_mapsize() as Environment#mapsize=.
+  * Cleanup and bug detection in environment_free.
+  * Add accessors:
+     * Transaction#env
+     * Database#env
+     * Cursor#database
+  * Add Cursor#next_range for iterating up to a specified key.
+
+0.4.5
+
+  * Expand file paths in #copy and #new.
+  * Fix bug: mark cursor list in transaction_mark.
+
+0.4.4
+
+  * Fix gemspec: permit ruby version >= 2.
+
+0.4.3
+
+  * Restore 1.9.3 compatibility.
+
 0.4.2
 
   * Fix #11, #12, #14.
