@@ -179,7 +179,10 @@ static VALUE call_with_transaction_helper(VALUE arg) {
 #endif
 
 static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags) {
+        ENVIRONMENT(venv, environment);
         HelperArgs arg = { self, name, argc, argv };
+        if(environment->flags & MDB_RDONLY)
+          flags |= MDB_RDONLY;
         return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
@@ -490,6 +493,7 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         environment->env = env;
         environment->thread_txn_hash = rb_hash_new();
         environment->txn_thread_hash = rb_hash_new();
+        environment->flags = options.flags;
 
         if (options.maxreaders > 0)
                 check(mdb_env_set_maxreaders(env, options.maxreaders));
