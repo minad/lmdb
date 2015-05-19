@@ -179,10 +179,7 @@ static VALUE call_with_transaction_helper(VALUE arg) {
 #endif
 
 static VALUE call_with_transaction(VALUE venv, VALUE self, const char* name, int argc, const VALUE* argv, int flags) {
-        ENVIRONMENT(venv, environment);
         HelperArgs arg = { self, name, argc, argv };
-        if(environment->flags & MDB_RDONLY)
-          flags |= MDB_RDONLY;
         return with_transaction(venv, call_with_transaction_helper, (VALUE)&arg, flags);
 }
 
@@ -209,6 +206,8 @@ static void stop_txn_begin(void *arg)
 
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags) {
         ENVIRONMENT(venv, environment);
+        if(environment->flags & MDB_RDONLY)
+          flags |= MDB_RDONLY;
 
         MDB_txn* txn;
         TxnArgs txn_args;
