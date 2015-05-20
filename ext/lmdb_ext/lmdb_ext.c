@@ -108,7 +108,7 @@ static VALUE transaction_abort(VALUE self) {
 }
 
 /**
- * @overload transaction_env
+ * @overload env
  *   @return [Environment] the environment in which this transaction is running.
  *   @example
  *      env.transaction do |t|
@@ -1025,7 +1025,7 @@ static VALUE database_cursor(VALUE self) {
 }
 
 /**
- * @overload database_env
+ * @overload env
  *   @return [Environment] the environment to which this database belongs.
  */
 static VALUE database_env(VALUE self) {
