@@ -356,7 +356,7 @@ static VALUE environment_info(VALUE self) {
 
         VALUE ret = rb_hash_new();
 
-#define INFO_SET(name) rb_hash_aset(ret, ID2SYM(rb_intern(#name)), INT2NUM((size_t)info.me_##name));
+#define INFO_SET(name) rb_hash_aset(ret, ID2SYM(rb_intern(#name)), SIZET2NUM((size_t)info.me_##name));
         INFO_SET(mapaddr);
         INFO_SET(mapsize);
         INFO_SET(last_pgno);
