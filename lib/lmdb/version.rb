@@ -1,3 +1,3 @@
 module LMDB
-  VERSION = '0.4.8-djt'
+  VERSION = '0.4.9-djt'
 end

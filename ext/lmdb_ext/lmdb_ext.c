@@ -809,6 +809,38 @@ static VALUE database_get_flags(VALUE self) {
 }
 
 /**
+ * @overload dupsort?
+ *   Returns whether the database is in +:dupsort+ mode.
+ *   @return [true, false]
+ */
+static VALUE database_is_dupsort(VALUE self) {
+        DATABASE(self, database);
+        if (!active_txn(database->env))
+                return call_with_transaction(database->env, self,
+                                             "dupsort?", 0, 0, MDB_RDONLY);
+        unsigned int flags;
+        check(mdb_dbi_flags(need_txn(database->env), database->dbi, &flags));
+
+        return (flags & MDB_DUPSORT) == 0 ? Qfalse : Qtrue;
+}
+
+/**
+ * @overload dupfixed?
+ *   Returns whether the database is in +:dupfixed+ mode.
+ *   @return [true, false]
+ */
+static VALUE database_is_dupfixed(VALUE self) {
+        DATABASE(self, database);
+        if (!active_txn(database->env))
+                return call_with_transaction(database->env, self,
+                                             "dupfixed?", 0, 0, MDB_RDONLY);
+        unsigned int flags;
+        check(mdb_dbi_flags(need_txn(database->env), database->dbi, &flags));
+
+        return (flags & MDB_DUPFIXED) == 0 ? Qfalse : Qtrue;
+}
+
+/**
  * @overload drop
  *   Remove a database from the environment.
  *   @return nil
@@ -1435,6 +1467,8 @@ void Init_lmdb_ext() {
         rb_undef_method(rb_singleton_class(cDatabase), "new");
         rb_define_method(cDatabase, "stat", database_stat, 0);
         rb_define_method(cDatabase, "flags", database_get_flags, 0);
+        rb_define_method(cDatabase, "dupsort?", database_is_dupsort, 0);
+        rb_define_method(cDatabase, "dupfixed?", database_is_dupfixed, 0);
         rb_define_method(cDatabase, "drop", database_drop, 0);
         rb_define_method(cDatabase, "clear", database_clear, 0);
         rb_define_method(cDatabase, "get", database_get, 1);

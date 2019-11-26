@@ -185,6 +185,8 @@ describe LMDB do
 
     it 'should return flags' do
       subject.flags.should be_instance_of(Hash)
+      subject.dupsort?.should == false
+      subject.dupfixed?.should == false
     end
 
     it 'should support named databases' do
@@ -344,6 +346,8 @@ describe LMDB do
 
       # check flag while we're at it
       dupdb.flags[:dupsort].should == true
+      dupdb.dupsort?.should == true
+      dupdb.dupfixed?.should == false
 
       dupdb.put 'key1', 'value1'
       dupdb.put 'key1', 'value2'

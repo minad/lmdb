@@ -130,6 +130,8 @@ static void database_mark(Database* database);
 static VALUE database_put(int argc, VALUE *argv, VALUE self);
 static VALUE database_stat(VALUE self);
 static VALUE database_get_flags(VALUE self);
+static VALUE database_is_dupsort(VALUE self);
+static VALUE database_is_dupfixed(VALUE self);
 static VALUE environment_active_txn(VALUE self);
 static VALUE environment_change_flags(int argc, VALUE* argv, VALUE self, int set);
 static void environment_check(Environment* environment);

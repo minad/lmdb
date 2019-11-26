@@ -46,14 +46,11 @@ module LMDB
     def has? key, value = nil
       v = get(key) or return false
       return true if value.nil? or value.to_s == v
+      return false unless dupsort?
 
-      if flags[:dupsort]
-        cursor do |c|
-          return !!c.set(key, value)
-        end
+      cursor do |c|
+        return !!c.set(key, value)
       end
-
-      false
     end
 
     # @return the number of records in this database
