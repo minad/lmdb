@@ -1,5 +1,6 @@
 *.o
 *.so
+*.bundle
 .#*
 *.log
 *.mdb
@@ -8,3 +9,4 @@ tmp/
 Gemfile.lock
 doc/
 .yardoc/
+*.gem

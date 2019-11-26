@@ -319,6 +319,16 @@ static VALUE stat2hash(const MDB_stat* stat) {
         return ret;
 }
 
+static VALUE flags2hash(int flags) {
+        VALUE ret = rb_hash_new();
+
+#define FLAG(const, name) rb_hash_aset(ret, ID2SYM(rb_intern(#name)), (flags & MDB_##const) == 0 ? Qfalse : Qtrue);
+#include "dbi_flags.h"
+#undef FLAG
+
+        return ret;
+}
+
 /**
  * @overload stat
  *   Return useful statistics about an environment.
@@ -784,6 +794,21 @@ static VALUE database_stat(VALUE self) {
 }
 
 /**
+ * @overload flags
+ *   Return the flags used to open the database.
+ *   @return [Hash] The flags.
+ */
+static VALUE database_get_flags(VALUE self) {
+        DATABASE(self, database);
+        if (!active_txn(database->env))
+                return call_with_transaction(database->env,
+                                             self, "flags", 0, 0, MDB_RDONLY);
+        unsigned int flags;
+        check(mdb_dbi_flags(need_txn(database->env), database->dbi, &flags));
+        return flags2hash(flags);
+}
+
+/**
  * @overload drop
  *   Remove a database from the environment.
  *   @return nil
@@ -1104,6 +1129,7 @@ static VALUE cursor_next(VALUE self) {
  *    Position the cursor to the next record in the database, and
  *    return its value if the record's key is less than or equal to
  *    the specified key, or nil otherwise.
+ *    @param key [#to_s] The key to serve as the upper bound
  *    @return [Array,nil] The [key, value] pair for the next record, or
  *        nil if no next record or the next record is out of the range.
  */
@@ -1130,20 +1156,40 @@ static VALUE cursor_next_range(VALUE self, VALUE upper_bound_key) {
 }
 
 /**
- * @overload set(key)
- *   Set the cursor to a specified key
- *   @param key The key to which the cursor should be positioned
- *   @return [Array] The [key, value] pair to which the cursor now points.
+ * @overload set(key, value = nil)
+ *   Set the cursor to a specified key, optionally at the specified
+ *   value if the database was opened with +:dupsort+.
+ *   @param key [#to_s] The key to which the cursor should be positioned
+ *   @param value [nil, #to_s] The optional value (+:dupsort+ only)
+ *   @return [Array] The +[key, value]+ pair to which the cursor now points.
  */
-static VALUE cursor_set(VALUE self, VALUE vkey) {
-        CURSOR(self, cursor);
-        MDB_val key, value;
+ static VALUE cursor_set(int argc, VALUE* argv, VALUE self) {
+         CURSOR(self, cursor);
+         VALUE vkey, vval;
+         MDB_val key, value;
+         MDB_cursor_op op = MDB_SET_KEY;
+         int ret;
 
-        key.mv_size = RSTRING_LEN(vkey);
-        key.mv_data = StringValuePtr(vkey);
+         rb_scan_args(argc, argv, "11", &vkey, &vval);
 
-        check(mdb_cursor_get(cursor->cur, &key, &value, MDB_SET_KEY));
-        return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+         key.mv_size = RSTRING_LEN(vkey);
+         key.mv_data = StringValuePtr(vkey);
+
+         if (!NIL_P(vval)) {
+                 op = MDB_GET_BOTH;
+                 value.mv_size = RSTRING_LEN(vval);
+                 value.mv_data = StringValuePtr(vval);
+         }
+
+         ret = mdb_cursor_get(cursor->cur, &key, &value, op);
+
+         if (!NIL_P(vval) && ret == MDB_NOTFOUND)
+                 return Qnil;
+
+         check(ret);
+
+         return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size),
+                             rb_str_new(value.mv_data, value.mv_size));
 }
 
 /**
@@ -1388,6 +1434,7 @@ void Init_lmdb_ext() {
         cDatabase = rb_define_class_under(mLMDB, "Database", rb_cObject);
         rb_undef_method(rb_singleton_class(cDatabase), "new");
         rb_define_method(cDatabase, "stat", database_stat, 0);
+        rb_define_method(cDatabase, "flags", database_get_flags, 0);
         rb_define_method(cDatabase, "drop", database_drop, 0);
         rb_define_method(cDatabase, "clear", database_clear, 0);
         rb_define_method(cDatabase, "get", database_get, 1);
@@ -1494,7 +1541,7 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "next", cursor_next, 0);
         rb_define_method(cCursor, "next_range", cursor_next_range, 1);
         rb_define_method(cCursor, "prev", cursor_prev, 0);
-        rb_define_method(cCursor, "set", cursor_set, 1);
+        rb_define_method(cCursor, "set", cursor_set, -1);
         rb_define_method(cCursor, "set_range", cursor_set_range, 1);
         rb_define_method(cCursor, "put", cursor_put, -1);
         rb_define_method(cCursor, "count", cursor_count, 0);

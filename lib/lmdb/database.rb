@@ -41,6 +41,21 @@ module LMDB
       value
     end
 
+    # Test if the database has a given key (or, if opened in
+    # +:dupsort+, value)
+    def has? key, value = nil
+      v = get(key) or return false
+      return true if value.nil? or value.to_s == v
+
+      if flags[:dupsort]
+        cursor do |c|
+          return !!c.set(key, value)
+        end
+      end
+
+      false
+    end
+
     # @return the number of records in this database
     def size
       stat[:entries]

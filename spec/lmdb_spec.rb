@@ -8,9 +8,9 @@ describe LMDB do
   let(:db)  { env.database }
 
   it 'has version constants' do
-    LMDB::LIB_VERSION_MAJOR.should be_instance_of(Fixnum)
-    LMDB::LIB_VERSION_MINOR.should be_instance_of(Fixnum)
-    LMDB::LIB_VERSION_PATCH.should be_instance_of(Fixnum)
+    LMDB::LIB_VERSION_MAJOR.should be_instance_of(Integer)
+    LMDB::LIB_VERSION_MINOR.should be_instance_of(Integer)
+    LMDB::LIB_VERSION_PATCH.should be_instance_of(Integer)
     LMDB::LIB_VERSION.should be_instance_of(String)
     LMDB::VERSION.should be_instance_of(String)
   end
@@ -52,22 +52,22 @@ describe LMDB do
 
     it 'should return stat' do
       stat = env.stat
-      stat[:psize].should be_instance_of(Fixnum)
-      stat[:depth].should be_instance_of(Fixnum)
-      stat[:branch_pages].should be_instance_of(Fixnum)
-      stat[:leaf_pages].should be_instance_of(Fixnum)
-      stat[:overflow_pages].should be_instance_of(Fixnum)
-      stat[:entries].should be_instance_of(Fixnum)
+      stat[:psize].should be_instance_of(Integer)
+      stat[:depth].should be_instance_of(Integer)
+      stat[:branch_pages].should be_instance_of(Integer)
+      stat[:leaf_pages].should be_instance_of(Integer)
+      stat[:overflow_pages].should be_instance_of(Integer)
+      stat[:entries].should be_instance_of(Integer)
     end
 
     it 'should return info' do
       info = env.info
-      info[:mapaddr].should be_instance_of(Fixnum)
-      info[:mapsize].should be_instance_of(Fixnum)
-      info[:last_pgno].should be_instance_of(Fixnum)
-      info[:last_txnid].should be_instance_of(Fixnum)
-      info[:maxreaders].should be_instance_of(Fixnum)
-      info[:numreaders].should be_instance_of(Fixnum)
+      info[:mapaddr].should be_instance_of(Integer)
+      info[:mapsize].should be_instance_of(Integer)
+      info[:last_pgno].should be_instance_of(Integer)
+      info[:last_txnid].should be_instance_of(Integer)
+      info[:maxreaders].should be_instance_of(Integer)
+      info[:numreaders].should be_instance_of(Integer)
     end
 
     it 'should set mapsize' do
@@ -183,6 +183,10 @@ describe LMDB do
   describe LMDB::Database do
     subject { db }
 
+    it 'should return flags' do
+      subject.flags.should be_instance_of(Hash)
+    end
+
     it 'should support named databases' do
       main = env.database
       db1 = env.database('db1', :create => true)
@@ -201,6 +205,10 @@ describe LMDB do
       subject.get('cat').should be_nil
       subject.put('cat', 'garfield').should be_nil
       subject.get('cat').should == 'garfield'
+
+      # check for key-value pairs on non-dupsort database
+      subject.has?('cat', 'garfield').should == true
+      subject.has?('cat', 'heathcliff').should == false
     end
 
     it 'should delete by key' do
@@ -328,6 +336,31 @@ describe LMDB do
         c.first
         c.next_range('key1').should == ['key1', 'value1']
         c.next_range('key1').should == nil
+      end
+    end
+
+    it 'should set to a key-value pair when db is dupsort' do
+      dupdb = env.database 'dupsort', create: true, dupsort: true
+
+      # check flag while we're at it
+      dupdb.flags[:dupsort].should == true
+
+      dupdb.put 'key1', 'value1'
+      dupdb.put 'key1', 'value2'
+      dupdb.cursor do |c|
+        c.set('key1', 'value2').should == ['key1', 'value2']
+        c.set('key1', 'value1').should == ['key1', 'value1']
+        c.set('key1', 'value3').should == nil
+      end
+
+      dupdb.has?('key1', 'value1').should == true
+      dupdb.has?('key1', 'value2').should == true
+      dupdb.has?('key1', 'value0').should == false
+    end
+
+    it 'should complain setting a key-value pair without dupsort' do
+      db.cursor do |c|
+        proc { c.set('key1', 'value1') }.should raise_error(LMDB::Error)
       end
     end
 
