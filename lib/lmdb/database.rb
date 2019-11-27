@@ -41,6 +41,29 @@ module LMDB
       value
     end
 
+    # Iterate over the duplicate values of a given key, using an
+    # implicit cursor. Works whether +:dupsort+ is set or not.
+    #
+    # @param key [#to_s] The key in question
+    # @yield value [String] the next value associated with the key
+    def each_value key, &block
+      return enum_for :each_value, key unless block_given?
+
+      value = get(key) or return
+      unless dupsort?
+        yield value
+        return
+      end
+
+      cursor do |c|
+        method = :set
+        while rec = c.send(method, key)
+          method = :next_range
+          yield rec[1]
+        end
+      end
+    end
+
     # Test if the database has a given key (or, if opened in
     # +:dupsort+, value)
     def has? key, value = nil

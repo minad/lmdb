@@ -786,7 +786,8 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
 static VALUE database_stat(VALUE self) {
         DATABASE(self, database);
         if (!active_txn(database->env))
-                return call_with_transaction(database->env, self, "stat", 0, 0, MDB_RDONLY);
+                return call_with_transaction(database->env,
+                                             self, "stat", 0, 0, MDB_RDONLY);
 
         MDB_stat stat;
         check(mdb_stat(need_txn(database->env), database->dbi, &stat));
@@ -807,6 +808,8 @@ static VALUE database_get_flags(VALUE self) {
         check(mdb_dbi_flags(need_txn(database->env), database->dbi, &flags));
         return flags2hash(flags);
 }
+
+/* XXX these two could probably also be macro'd, or maybe not i dunno */
 
 /**
  * @overload dupsort?

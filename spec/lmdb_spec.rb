@@ -360,6 +360,8 @@ describe LMDB do
       dupdb.has?('key1', 'value1').should == true
       dupdb.has?('key1', 'value2').should == true
       dupdb.has?('key1', 'value0').should == false
+
+      dupdb.each_value('key1').to_a.sort.should == ['value1', 'value2']
     end
 
     it 'should complain setting a key-value pair without dupsort' do
