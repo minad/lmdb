@@ -1142,21 +1142,30 @@ static VALUE cursor_prev(VALUE self) {
 }
 
 /**
- * @overload next
+ * @overload next nodup = nil
  *    Position the cursor to the next record in the database, and
  *    return its value.
+ *    @param nodup [true, false] If true, skip over duplicate records.
  *    @return [Array,nil] The [key, value] pair for the next record, or
  *        nil if no next record.
  */
-static VALUE cursor_next(VALUE self) {
+static VALUE cursor_next(int argc, VALUE* argv, VALUE self) {
         CURSOR(self, cursor);
+        VALUE nodup;
         MDB_val key, value;
+        MDB_cursor_op op = MDB_NEXT;
 
-        int ret = mdb_cursor_get(cursor->cur, &key, &value, MDB_NEXT);
+        rb_scan_args(argc, argv, "01", &nodup);
+
+        if (RTEST(nodup))
+          op = MDB_NEXT_NODUP;
+
+        int ret = mdb_cursor_get(cursor->cur, &key, &value, op);
         if (ret == MDB_NOTFOUND)
                 return Qnil;
         check(ret);
-        return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size), rb_str_new(value.mv_data, value.mv_size));
+        return rb_assoc_new(rb_str_new(key.mv_data, key.mv_size),
+                            rb_str_new(value.mv_data, value.mv_size));
 }
 
 /**
@@ -1575,7 +1584,7 @@ void Init_lmdb_ext() {
         rb_define_method(cCursor, "get", cursor_get, 0);
         rb_define_method(cCursor, "first", cursor_first, 0);
         rb_define_method(cCursor, "last", cursor_last, 0);
-        rb_define_method(cCursor, "next", cursor_next, 0);
+        rb_define_method(cCursor, "next", cursor_next, -1);
         rb_define_method(cCursor, "next_range", cursor_next_range, 1);
         rb_define_method(cCursor, "prev", cursor_prev, 0);
         rb_define_method(cCursor, "set", cursor_set, -1);

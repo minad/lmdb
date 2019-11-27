@@ -116,7 +116,7 @@ static void cursor_free(Cursor* cursor);
 static VALUE cursor_get(VALUE self);
 static VALUE cursor_last(VALUE self);
 static void cursor_mark(Cursor* cursor);
-static VALUE cursor_next(VALUE self);
+static VALUE cursor_next(int argc, VALUE* argv, VALUE self);
 static VALUE cursor_prev(VALUE self);
 static VALUE cursor_put(int argc, VALUE* argv, VALUE self);
 static VALUE cursor_set(int argc, VALUE* argv, VALUE self);

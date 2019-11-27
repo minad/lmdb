@@ -287,6 +287,12 @@ describe LMDB do
       main.env.should == env
       db1.env.should == env
     end
+
+    it 'should iterate over/list keys' do
+      db['k1'] = 'v1'
+      db['k2'] = 'v2'
+      db.keys.sort.should == %w[k1 k2]
+    end
   end
 
   describe LMDB::Cursor do
@@ -351,6 +357,7 @@ describe LMDB do
 
       dupdb.put 'key1', 'value1'
       dupdb.put 'key1', 'value2'
+      dupdb.put 'key2', 'value3'
       dupdb.cursor do |c|
         c.set('key1', 'value2').should == ['key1', 'value2']
         c.set('key1', 'value1').should == ['key1', 'value1']
@@ -367,6 +374,8 @@ describe LMDB do
 
       # we should have two entries for key1
       dupdb.cardinality('key1').should == 2
+
+      dupdb.each_key.to_a.sort.should == ['key1', 'key2']
     end
 
     it 'should complain setting a key-value pair without dupsort' do

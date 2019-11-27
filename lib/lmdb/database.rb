@@ -41,6 +41,25 @@ module LMDB
       value
     end
 
+    # Get the keys as an array.
+    # @return [Array] of keys.
+    def keys
+      each_key.to_a
+    end
+
+    # Iterate over each key in the database, skipping over duplicate records.
+    #
+    # @yield key [String] the next key in the database.
+    # @return [Enumerator] in lieu of a block.
+    def each_key &block
+      return enum_for :each_key unless block_given?
+      cursor do |c|
+        while (k, _ = c.next true)
+          yield k
+        end
+      end
+    end
+
     # Iterate over the duplicate values of a given key, using an
     # implicit cursor. Works whether +:dupsort+ is set or not.
     #
