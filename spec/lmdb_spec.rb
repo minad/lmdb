@@ -357,11 +357,16 @@ describe LMDB do
         c.set('key1', 'value3').should == nil
       end
 
+      # this is basically an extended test of `cursor.set key, val`
       dupdb.has?('key1', 'value1').should == true
       dupdb.has?('key1', 'value2').should == true
       dupdb.has?('key1', 'value0').should == false
 
+      # match the contents of key1
       dupdb.each_value('key1').to_a.sort.should == ['value1', 'value2']
+
+      # we should have two entries for key1
+      dupdb.cardinality('key1').should == 2
     end
 
     it 'should complain setting a key-value pair without dupsort' do

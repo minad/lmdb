@@ -44,8 +44,9 @@ module LMDB
     # Iterate over the duplicate values of a given key, using an
     # implicit cursor. Works whether +:dupsort+ is set or not.
     #
-    # @param key [#to_s] The key in question
-    # @yield value [String] the next value associated with the key
+    # @param key [#to_s] The key in question.
+    # @yield value [String] the next value associated with the key.
+    # @return [Enumerator] in lieu of a block.
     def each_value key, &block
       return enum_for :each_value, key unless block_given?
 
@@ -64,6 +65,19 @@ module LMDB
       end
     end
 
+    # Return the cardinality (number of duplicates) of a given
+    # key. Works whether +:dupsort+ is set or not.
+    # @param key [#to_s] The key in question.
+    # @return [Integer] The number of entries under the key.
+    def cardinality key
+      return unless get key
+      return 1 unless dupsort?
+      cursor do |c|
+        c.set key
+        return c.count
+      end
+    end
+
     # Test if the database has a given key (or, if opened in
     # +:dupsort+, value)
     def has? key, value = nil
@@ -75,6 +89,8 @@ module LMDB
         return !!c.set(key, value)
       end
     end
+
+
 
     # @return the number of records in this database
     def size
