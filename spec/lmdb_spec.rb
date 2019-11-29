@@ -224,6 +224,9 @@ describe LMDB do
       subject.put('cat', 'garfield')
       subject.delete('cat', 'garfield').should be_nil
       proc { subject.delete('cat', 'garfield') }.should raise_error(LMDB::Error::NOTFOUND)
+
+      # soft delete
+      subject.delete?('cat', 'heathcliff').should be_nil
     end
 
     it 'stores key/values in same transaction' do

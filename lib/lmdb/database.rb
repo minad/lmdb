@@ -109,7 +109,13 @@ module LMDB
       end
     end
 
-
+    # Delete the key (and optional value pair) if it exists; do not
+    # complain about missing keys.
+    # @param key [#to_s] The key.
+    # @param value [#to_s] The optional value.
+    def delete? key, value = nil
+      delete key, value if has? key, value
+    end
 
     # @return the number of records in this database
     def size
