@@ -89,11 +89,13 @@ module LMDB
     # @param key [#to_s] The key in question.
     # @return [Integer] The number of entries under the key.
     def cardinality key
-      return unless get key
-      return 1 unless dupsort?
-      cursor do |c|
-        c.set key
-        return c.count
+      env.transaction do
+        return 0 unless get key
+        return 1 unless dupsort?
+        cursor do |c|
+          c.set key
+          return c.count
+        end
       end
     end
 
