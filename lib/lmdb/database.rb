@@ -53,12 +53,12 @@ module LMDB
     #
     # @yield key [String] the next key in the database.
     # @return [Enumerator] in lieu of a block.
-    def each_key &block
+    def each_key(&block)
       return enum_for :each_key unless block_given?
       env.transaction true do
         cursor do |c|
-          while (k, _ = c.next true)
-            yield k
+          while (rec = c.next true)
+            yield rec.first
           end
         end
       end
@@ -70,7 +70,7 @@ module LMDB
     # @param key [#to_s] The key in question.
     # @yield value [String] the next value associated with the key.
     # @return [Enumerator] in lieu of a block.
-    def each_value key, &block
+    def each_value(key, &block)
       return enum_for :each_value, key unless block_given?
 
       value = get(key) or return
@@ -94,7 +94,7 @@ module LMDB
     # key. Works whether +:dupsort+ is set or not.
     # @param key [#to_s] The key in question.
     # @return [Integer] The number of entries under the key.
-    def cardinality key
+    def cardinality(key)
       env.transaction true do
         return 0 unless get key
         return 1 unless dupsort?
@@ -123,7 +123,7 @@ module LMDB
     # complain about missing keys.
     # @param key [#to_s] The key.
     # @param value [#to_s] The optional value.
-    def delete? key, value = nil
+    def delete?(key, value = nil)
       delete key, value if has? key, value
     end
 
