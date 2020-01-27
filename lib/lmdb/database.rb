@@ -11,9 +11,11 @@ module LMDB
     #      puts "at #{key}: #{value}"
     #    end
     def each
-      cursor do |c|
-        while i = c.next
-          yield(i)
+      env.transaction true do
+        cursor do |c|
+          while i = c.next
+            yield(i)
+          end
         end
       end
     end
@@ -53,9 +55,11 @@ module LMDB
     # @return [Enumerator] in lieu of a block.
     def each_key &block
       return enum_for :each_key unless block_given?
-      cursor do |c|
-        while (k, _ = c.next true)
-          yield k
+      env.transaction true do
+        cursor do |c|
+          while (k, _ = c.next true)
+            yield k
+          end
         end
       end
     end
@@ -75,11 +79,13 @@ module LMDB
         return
       end
 
-      cursor do |c|
-        method = :set
-        while rec = c.send(method, key)
-          method = :next_range
-          yield rec[1]
+      env.transaction true do
+        cursor do |c|
+          method = :set
+          while rec = c.send(method, key)
+            method = :next_range
+            yield rec[1]
+          end
         end
       end
     end
@@ -89,7 +95,7 @@ module LMDB
     # @param key [#to_s] The key in question.
     # @return [Integer] The number of entries under the key.
     def cardinality key
-      env.transaction do
+      env.transaction true do
         return 0 unless get key
         return 1 unless dupsort?
         cursor do |c|
@@ -106,8 +112,10 @@ module LMDB
       return true if value.nil? or value.to_s == v
       return false unless dupsort?
 
-      cursor do |c|
-        return !!c.set(key, value)
+      env.transaction true do
+        cursor do |c|
+          return !!c.set(key, value)
+        end
       end
     end
 
