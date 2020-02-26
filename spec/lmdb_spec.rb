@@ -37,7 +37,8 @@ describe LMDB do
       end
 
       it 'accepts options' do
-        env = LMDB::Environment.new(path, :nosync => true, :mode => 0777, :maxreaders => 777, :mapsize => 111111, :maxdbs => 666)
+        env = LMDB::Environment.new(path, nosync: true, mode: 0777,
+          maxreaders: 777, mapsize: 111111, maxdbs: 666)
         env.should be_instance_of(described_class)
         env.info[:maxreaders].should == 777
         env.info[:mapsize].should == 111111
@@ -191,8 +192,8 @@ describe LMDB do
 
     it 'should support named databases' do
       main = env.database
-      db1 = env.database('db1', :create => true)
-      db2 = env.database('db2', :create => true)
+      db1 = env.database('db1', create: true)
+      db2 = env.database('db2', create: true)
 
       main['key'] = '1'
       db1['key'] = '2'
@@ -286,7 +287,7 @@ describe LMDB do
 
     it 'should get environment' do
       main = env.database
-      db1 = env.database('db1', :create => true)
+      db1 = env.database('db1', create: true)
       main.env.should == env
       db1.env.should == env
     end
@@ -379,6 +380,11 @@ describe LMDB do
       dupdb.cardinality('key1').should == 2
 
       dupdb.each_key.to_a.sort.should == ['key1', 'key2']
+
+      # XXX move this or whatever
+      env.transaction do |t|
+        dupdb.put 'key1', 'value1' unless dupdb.has? 'key1', 'value1'
+      end
     end
 
     it 'should complain setting a key-value pair without dupsort' do
@@ -401,6 +407,13 @@ describe LMDB do
       db2 = nil
       env.transaction { c = db.cursor; db2 = c.database }
       db2.should == db
+    end
+
+    it 'should nest a read-only txn in a read-write' do
+      env.transaction do |t|
+        # has? opens a read-only transaction
+        db.put 'hurr', 'durr' unless db.has? 'hurr', 'durr'
+      end
     end
   end
 end

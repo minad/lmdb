@@ -120,6 +120,12 @@ static VALUE transaction_env(VALUE self) {
         TRANSACTION(self, transaction);
         return transaction->env;
 }
+/*
+static VALUE transaction_is_readonly(VALUE self) {
+  TRANSACTION(self, transaction);
+  MDB_txn* txn = transaction->txn;
+  return (txn->mt_flags & MDB_RDONLY) ? Qtrue : Qfalse;
+}*/
 
 static void transaction_finish(VALUE self, int commit) {
         TRANSACTION(self, transaction);
@@ -1189,7 +1195,7 @@ static VALUE cursor_next_range(VALUE self, VALUE upper_bound_key) {
         ub_key.mv_size = RSTRING_LEN(upper_bound_key);
         ub_key.mv_data = StringValuePtr(upper_bound_key);
 
-        MDB_txn *txn = mdb_cursor_txn(cursor->cur);
+        MDB_txn* txn = mdb_cursor_txn(cursor->cur);
         MDB_dbi dbi = mdb_cursor_dbi(cursor->cur);
 
         if (mdb_cmp(txn, dbi, &key, &ub_key) <= 0) {
@@ -1551,6 +1557,7 @@ void Init_lmdb_ext() {
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
         rb_define_method(cTransaction, "env", transaction_env, 0);
+        /*rb_define_method(cTransaction, "readonly?", transaction_is_readonly, 0);*/
 
         /**
          * Document-class: LMDB::Cursor

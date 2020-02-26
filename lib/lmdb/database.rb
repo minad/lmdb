@@ -11,7 +11,7 @@ module LMDB
     #      puts "at #{key}: #{value}"
     #    end
     def each
-      env.transaction true do
+      maybe_txn true do
         cursor do |c|
           while i = c.next
             yield(i)
@@ -55,7 +55,7 @@ module LMDB
     # @return [Enumerator] in lieu of a block.
     def each_key(&block)
       return enum_for :each_key unless block_given?
-      env.transaction true do
+      maybe_txn true do
         cursor do |c|
           while (rec = c.next true)
             yield rec.first
@@ -79,7 +79,7 @@ module LMDB
         return
       end
 
-      env.transaction true do
+      maybe_txn true do |t|
         cursor do |c|
           method = :set
           while rec = c.send(method, key)
@@ -95,28 +95,35 @@ module LMDB
     # @param key [#to_s] The key in question.
     # @return [Integer] The number of entries under the key.
     def cardinality(key)
-      env.transaction true do
-        return 0 unless get key
-        return 1 unless dupsort?
-        cursor do |c|
-          c.set key
-          return c.count
+      ret = 0
+      maybe_txn true do |t|
+        if get key
+          if dupsort?
+            cursor do |c|
+              c.set key
+              ret = c.count
+            end
+          else
+            ret = 1
+          end
         end
       end
+      ret
     end
 
     # Test if the database has a given key (or, if opened in
     # +:dupsort+, value)
-    def has? key, value = nil
+    def has?(key, value = nil)
       v = get(key) or return false
       return true if value.nil? or value.to_s == v
       return false unless dupsort?
 
-      env.transaction true do
-        cursor do |c|
-          return !!c.set(key, value)
-        end
+      ret = false
+      # read-only txn was having trouble being nested inside a read-write
+      maybe_txn true do |t|
+        cursor { |c| ret = !!c.set(key, value) }
       end
+      ret
     end
 
     # Delete the key (and optional value pair) if it exists; do not
@@ -130,6 +137,21 @@ module LMDB
     # @return the number of records in this database
     def size
       stat[:entries]
+    end
+
+    private
+
+    # having trouble with read-only transactions embedded in
+    # read-write for some reason; can't pin it down to test it yet so
+    # going to do this (djt; 2020-02-10)
+    def maybe_txn(readonly, &block)
+      if t = env.active_txn
+        yield t
+      else
+        env.transaction !!readonly do |t|
+          yield t
+        end
+      end
     end
   end
 end
