@@ -755,7 +755,7 @@ static VALUE environment_database(int argc, VALUE *argv, VALUE self) {
                 return call_with_transaction(self, self, "database", argc, argv, 0);
 
         VALUE name, option_hash;
-        rb_scan_args(argc, argv, "01:", &name, &option_hash);
+        rb_scan_args_kw(RB_SCAN_ARGS_KEYWORDS, argc, argv, "01:", &name, &option_hash);
 
         int flags = 0;
         if (!NIL_P(option_hash))
