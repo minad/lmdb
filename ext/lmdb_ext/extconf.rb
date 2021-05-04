@@ -1,6 +1,6 @@
 require 'mkmf'
 
-$CFLAGS = '-std=c99 -Wall -g'
+$CFLAGS << ' -std=c99 -Wall -g '
 
 # Embed lmdb if we cannot find it
 if enable_config("bundled-lmdb", false) || !(find_header('lmdb.h') && have_library('lmdb', 'mdb_env_create'))
