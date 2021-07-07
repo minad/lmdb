@@ -206,6 +206,8 @@ static void stop_txn_begin(void *arg)
 
 static VALUE with_transaction(VALUE venv, VALUE(*fn)(VALUE), VALUE arg, int flags) {
         ENVIRONMENT(venv, environment);
+        if(environment->flags & MDB_RDONLY)
+          flags |= MDB_RDONLY;
 
         MDB_txn* txn;
         TxnArgs txn_args;
@@ -500,6 +502,7 @@ static VALUE environment_new(int argc, VALUE *argv, VALUE klass) {
         environment->env = env;
         environment->thread_txn_hash = rb_hash_new();
         environment->txn_thread_hash = rb_hash_new();
+        environment->flags = options.flags;
 
         if (options.maxreaders > 0)
                 check(mdb_env_set_maxreaders(env, options.maxreaders));
