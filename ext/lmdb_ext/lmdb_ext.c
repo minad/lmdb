@@ -1435,6 +1435,7 @@ void Init_lmdb_ext() {
          *    env.close
          */
         cEnvironment = rb_define_class_under(mLMDB, "Environment", rb_cObject);
+        rb_undef_alloc_func(cEnvironment);
         rb_define_singleton_method(cEnvironment, "new", environment_new, -1);
         rb_define_method(cEnvironment, "database", environment_database, -1);
         rb_define_method(cEnvironment, "active_txn", environment_active_txn, 0);
@@ -1476,6 +1477,7 @@ void Init_lmdb_ext() {
          *    env.close
          */
         cDatabase = rb_define_class_under(mLMDB, "Database", rb_cObject);
+        rb_undef_alloc_func(cDatabase);
         rb_undef_method(rb_singleton_class(cDatabase), "new");
         rb_define_method(cDatabase, "stat", database_stat, 0);
         rb_define_method(cDatabase, "flags", database_get_flags, 0);
@@ -1547,6 +1549,7 @@ void Init_lmdb_ext() {
          *                            #=> storage.
          */
         cTransaction = rb_define_class_under(mLMDB, "Transaction", rb_cObject);
+        rb_undef_alloc_func(cTransaction);
         rb_undef_method(rb_singleton_class(cTransaction), "new");
         rb_define_method(cTransaction, "commit", transaction_commit, 0);
         rb_define_method(cTransaction, "abort", transaction_abort, 0);
@@ -1579,6 +1582,7 @@ void Init_lmdb_ext() {
          *    end
          */
         cCursor = rb_define_class_under(mLMDB, "Cursor", rb_cObject);
+        rb_undef_alloc_func(cCursor);
         rb_undef_method(rb_singleton_class(cCursor), "new");
         rb_define_method(cCursor, "close", cursor_close, 0);
         rb_define_method(cCursor, "get", cursor_get, 0);
