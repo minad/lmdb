@@ -4,7 +4,7 @@
 [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=min4d&url=https://github.com/minad/lmdb&title=LMDB&language=&tags=github&category=software)
 
 Ruby bindings for the amazing OpenLDAP's Lightning Memory-Mapped Database (LMDB)
-http://symas.com/mdb/
+http://symas.com/lmdb/
 
 ## Installation
 
